@@ -8,7 +8,7 @@ interface Pair {
 }
 
 // Load the pairs from the CSV file (mocked here for now)
-const pairs: Pair[] = [
+const pairs: { khmer: string; thai: string }[] = [
   { khmer: 'ក', thai: 'ก' },
   { khmer: 'ខ', thai: 'ข' },
   { khmer: 'ង', thai: 'ง' },
@@ -28,7 +28,7 @@ const pairs: Pair[] = [
   { khmer: 'វ', thai: 'ว' },
   { khmer: 'ស', thai: 'ส' },
   { khmer: 'ហ', thai: 'ห' },
-  { khmer: 'អ', thai: 'อ' },
+  { khmer: 'អ', thai: 'อ' }
 ];
 
 const QuizApp: React.FC = () => {
