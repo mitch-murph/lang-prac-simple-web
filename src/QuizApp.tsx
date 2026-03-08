@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Typography, Box, Grid, Paper } from '@mui/material';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Pause from '@mui/icons-material/Pause';
 
 // Define the type for a pair
 interface Pair {
@@ -103,51 +105,69 @@ const QuizApp: React.FC = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 3, fontFamily: 'Arial, sans-serif' }}>
-      <Paper elevation={3} sx={{ p: 3, textAlign: 'center', width: '100%', maxWidth: 600 }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', justifyContent: 'center', alignItems: 'center', p: 3, fontFamily: 'Arial, sans-serif' }}>
+      <Paper elevation={4} sx={{ p: 4, textAlign: 'center', width: '100%', maxWidth: 720 }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Khmer-Thai Alphabet Quiz
         </Typography>
         <Typography variant="subtitle1" gutterBottom>
           Listen to the audio and select the correct pair
         </Typography>
-      </Paper>
 
-      {currentPair && (
-        <Box sx={{ mt: 3, width: '100%', maxWidth: 500 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 3 }}>
-            <Button variant="contained" onClick={() => playAudio('khmer')}>
-              Khmer {isPlaying === 'khmer' ? '🔊' : '🎵'}
-            </Button>
-            <Button variant="contained" onClick={() => playAudio('thai')}>
-              Thai {isPlaying === 'thai' ? '🔊' : '🎵'}
-            </Button>
+        {currentPair && (
+          <Box sx={{ mt: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 2 }}>
+              <Button
+                variant="contained"
+                onClick={() => playAudio('khmer')}
+                sx={{ minWidth: 120 }}
+                startIcon={isPlaying === 'khmer' ? <Pause /> : <PlayArrow />}
+                aria-label="Play Khmer audio"
+              >
+                Khmer
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => playAudio('thai')}
+                sx={{ minWidth: 120 }}
+                startIcon={isPlaying === 'thai' ? <Pause /> : <PlayArrow />}
+                aria-label="Play Thai audio"
+              >
+                Thai
+              </Button>
+            </Box>
+
+            <Typography variant="h3" component="div" sx={{ mt: 1, mb: 2, fontSize: { xs: '1.6rem', sm: '2rem' } }}>
+              {currentPair.khmer}  /  {currentPair.thai}
+            </Typography>
+
+            <Grid container spacing={2}>
+              {options.map((option) => (
+                <Grid size={6} key={option}>
+                  <Button
+                    variant="outlined"
+                    fullWidth
+                    onClick={() => handleAnswer(option)}
+                    sx={{ py: 1.8, fontSize: '1.1rem' }}
+                  >
+                    {option}
+                  </Button>
+                </Grid>
+              ))}
+            </Grid>
           </Box>
-          <Grid container spacing={2}>
-            {options.map((option) => (
-              <Grid size={6} key={option}>
-                <Button
-                  variant="outlined"
-                  fullWidth
-                  onClick={() => handleAnswer(option)}
-                >
-                  {option}
-                </Button>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
-      )}
+        )}
 
-      {feedback && (
-        <Typography variant="body1" color={feedback === 'Correct!' ? 'success.main' : 'error.main'} sx={{ mt: 2 }}>
-          {feedback}
+        {feedback && (
+          <Typography variant="body1" color={feedback === 'Correct!' ? 'success.main' : 'error.main'} sx={{ mt: 2 }}>
+            {feedback}
+          </Typography>
+        )}
+
+        <Typography variant="body1" sx={{ mt: 3 }}>
+          Score: {score}
         </Typography>
-      )}
-
-      <Typography variant="body1" sx={{ mt: 3 }}>
-        Score: {score}
-      </Typography>
+      </Paper>
     </Box>
   );
 };
