@@ -35,9 +35,9 @@ const pairs: { khmer: string; thai: string }[] = [
 
 const QuizApp: React.FC = () => {
   const [currentPair, setCurrentPair] = useState<Pair | null>(null);
-  const [options, setOptions] = useState<string[]>([]);
+  const [options, setOptions] = useState<Pair[]>([]);
   const [score, setScore] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [selectedOption, setSelectedOption] = useState<Pair | null>(null);
   const [isPlaying, setIsPlaying] = useState<'khmer' | 'thai' | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -46,14 +46,13 @@ const QuizApp: React.FC = () => {
     const randomPair = pairs[Math.floor(Math.random() * pairs.length)];
     setCurrentPair(randomPair);
 
-    // Generate options (correct + random wrong answers)
+    // Generate options (correct + random wrong answers) as Pair objects
     const wrongAnswers = pairs
       .filter((pair) => pair.thai !== randomPair.thai)
       .sort(() => 0.5 - Math.random())
-      .slice(0, 3)
-      .map((pair) => `${pair.khmer} / ${pair.thai}`);
+      .slice(0, 3);
 
-    const correctOption = `${randomPair.khmer} / ${randomPair.thai}`;
+    const correctOption = randomPair;
     const allOptions = [...wrongAnswers, correctOption].sort(() => 0.5 - Math.random());
     setOptions(allOptions);
     setSelectedOption(null);
@@ -63,13 +62,16 @@ const QuizApp: React.FC = () => {
     loadNewQuestion();
   }, [loadNewQuestion]);
 
+  const isSamePair = (a: Pair | null | undefined, b: Pair | null | undefined) =>
+    !!a && !!b && a.khmer === b.khmer && a.thai === b.thai;
+
   const handleAnswer = useCallback(
-    (answer: string) => {
+    (answer: Pair) => {
       if (!currentPair) return;
 
       setSelectedOption(answer);
 
-      if (answer === `${currentPair.khmer} / ${currentPair.thai}`) {
+      if (isSamePair(answer, currentPair)) {
         setScore((prev) => prev + 1);
       }
 
@@ -143,9 +145,9 @@ const QuizApp: React.FC = () => {
 
             <Grid container spacing={2}>
               {options.map((option) => {
-                const correctOption = currentPair ? `${currentPair.khmer} / ${currentPair.thai}` : null;
-                const isCorrect = correctOption === option;
-                const isSelected = selectedOption === option;
+                const correctOption = currentPair ? currentPair : null;
+                const isCorrect = isSamePair(correctOption, option);
+                const isSelected = isSamePair(selectedOption, option);
                 let bg: any = undefined;
                 let color: any = undefined;
 
@@ -160,15 +162,23 @@ const QuizApp: React.FC = () => {
                 }
 
                 return (
-                  <Grid size={6} key={option}>
+                  <Grid size={6} key={`${option.khmer}_${option.thai}`}>
                     <Button
                       variant="outlined"
                       fullWidth
                       onClick={() => handleAnswer(option)}
-                      sx={{ fontSize: 32, bgcolor: bg, color }}
+                      sx={{
+                        fontSize: 32,
+                        bgcolor: bg,
+                        color,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                      }}
                       disabled={!!selectedOption}
                     >
-                      {option}
+                      <span>{option.khmer}</span>
+                      <span>{option.thai}</span>
                     </Button>
                   </Grid>
                 );
