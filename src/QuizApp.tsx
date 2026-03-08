@@ -37,7 +37,7 @@ const QuizApp: React.FC = () => {
   const [currentPair, setCurrentPair] = useState<Pair | null>(null);
   const [options, setOptions] = useState<string[]>([]);
   const [score, setScore] = useState(0);
-  const [feedback, setFeedback] = useState<string>('');
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState<'khmer' | 'thai' | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -56,7 +56,7 @@ const QuizApp: React.FC = () => {
     const correctOption = `${randomPair.khmer} / ${randomPair.thai}`;
     const allOptions = [...wrongAnswers, correctOption].sort(() => 0.5 - Math.random());
     setOptions(allOptions);
-    setFeedback('');
+    setSelectedOption(null);
   }, []);
 
   useEffect(() => {
@@ -65,13 +65,17 @@ const QuizApp: React.FC = () => {
 
   const handleAnswer = useCallback(
     (answer: string) => {
-      if (currentPair && answer === `${currentPair.khmer} / ${currentPair.thai}`) {
+      if (!currentPair) return;
+
+      setSelectedOption(answer);
+
+      if (answer === `${currentPair.khmer} / ${currentPair.thai}`) {
         setScore((prev) => prev + 1);
-        setFeedback('Correct!');
-      } else {
-        setFeedback('Incorrect.');
       }
-      setTimeout(loadNewQuestion, 1000);
+
+      setTimeout(() => {
+        loadNewQuestion();
+      }, 1000);
     },
     [currentPair, loadNewQuestion]
   );
@@ -105,8 +109,8 @@ const QuizApp: React.FC = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', justifyContent: 'center', alignItems: 'center', p: 3, fontFamily: 'Arial, sans-serif' }}>
-      <Paper elevation={4} sx={{ p: 4, textAlign: 'center', width: '100%', maxWidth: 720 }}>
+    <Box sx={{ maxWidth: 600, mx: 'auto' }}>
+      <Paper elevation={4} sx={{ p: 4, textAlign: 'center' }}>
         <Typography variant="h4" component="h1" gutterBottom>
           Khmer-Thai Alphabet Quiz
         </Typography>
@@ -137,32 +141,42 @@ const QuizApp: React.FC = () => {
               </Button>
             </Box>
 
-            <Typography variant="h3" component="div" sx={{ mt: 1, mb: 2, fontSize: { xs: '1.6rem', sm: '2rem' } }}>
-              {currentPair.khmer}  /  {currentPair.thai}
-            </Typography>
-
             <Grid container spacing={2}>
-              {options.map((option) => (
-                <Grid size={6} key={option}>
-                  <Button
-                    variant="outlined"
-                    fullWidth
-                    onClick={() => handleAnswer(option)}
-                    sx={{ py: 1.8, fontSize: '1.1rem' }}
-                  >
-                    {option}
-                  </Button>
-                </Grid>
-              ))}
+              {options.map((option) => {
+                const correctOption = currentPair ? `${currentPair.khmer} / ${currentPair.thai}` : null;
+                const isCorrect = correctOption === option;
+                const isSelected = selectedOption === option;
+                let bg: any = undefined;
+                let color: any = undefined;
+
+                if (selectedOption) {
+                  if (isCorrect) {
+                    bg = 'success.main';
+                    color = 'common.white';
+                  } else if (isSelected) {
+                    bg = 'error.main';
+                    color = 'common.white';
+                  }
+                }
+
+                return (
+                  <Grid size={6} key={option}>
+                    <Button
+                      variant="outlined"
+                      fullWidth
+                      onClick={() => handleAnswer(option)}
+                      sx={{ fontSize: 32, bgcolor: bg, color }}
+                      disabled={!!selectedOption}
+                    >
+                      {option}
+                    </Button>
+                  </Grid>
+                );
+              })}
             </Grid>
           </Box>
         )}
 
-        {feedback && (
-          <Typography variant="body1" color={feedback === 'Correct!' ? 'success.main' : 'error.main'} sx={{ mt: 2 }}>
-            {feedback}
-          </Typography>
-        )}
 
         <Typography variant="body1" sx={{ mt: 3 }}>
           Score: {score}
