@@ -1,77 +1,96 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button, Typography, Box, Grid, Paper } from '@mui/material';
 import PlayArrow from '@mui/icons-material/PlayArrow';
 import Pause from '@mui/icons-material/Pause';
 
-// Define the type for a pair
-interface Pair {
-  khmer: string;
-  thai: string;
+// Generic quiz types
+export interface QuizItem {
+  id: string;
+  [fieldName: string]: string; // field values, e.g., khmer: 'áž€', thai: 'à¸'
 }
 
-// Load the pairs from the CSV file (mocked here for now)
-const pairs: { khmer: string; thai: string }[] = [
-  { khmer: 'ក', thai: 'ก' },
-  { khmer: 'ខ', thai: 'ข' },
-  { khmer: 'ង', thai: 'ง' },
-  { khmer: 'ច', thai: 'จ' },
-  { khmer: 'ញ', thai: 'ญ' },
-  { khmer: 'ដ', thai: 'ด' },
-  { khmer: 'ត', thai: 'ต' },
-  { khmer: 'ថ', thai: 'ถ' },
-  { khmer: 'ន', thai: 'น' },
-  { khmer: 'ប', thai: 'บ' },
-  { khmer: 'ព', thai: 'ป' },
-  { khmer: 'ផ', thai: 'พ' },
-  { khmer: 'ម', thai: 'ม' },
-  { khmer: 'យ', thai: 'ย' },
-  { khmer: 'រ', thai: 'ร' },
-  { khmer: 'ល', thai: 'ล' },
-  { khmer: 'វ', thai: 'ว' },
-  { khmer: 'ស', thai: 'ส' },
-  { khmer: 'ហ', thai: 'ห' },
-  { khmer: 'អ', thai: 'อ' }
-];
+export interface QuizField {
+  name: string; // field name, e.g., 'khmer'
+  label: string; // display label for audio button, e.g., 'Khmer'
+  audioPathTemplate?: (value: string) => string; // e.g., (val) => `data/khmer-alphabet/${val}.mp3`
+}
 
-const QuizApp: React.FC = () => {
-  const [currentPair, setCurrentPair] = useState<Pair | null>(null);
-  const [options, setOptions] = useState<Pair[]>([]);
+export interface QuizContent {
+  title: string;
+  subtitle: string;
+  items: QuizItem[];
+  fields: QuizField[];
+  mode: 'sound-to-character' | 'character-to-sound'; // How to present the quiz
+}
+
+// Factory helper to create QuizContent from simple mappings
+export function createQuizContent(config: {
+  title: string;
+  subtitle: string;
+  mode: 'sound-to-character' | 'character-to-sound';
+  fields: Array<{
+    name: string;
+    label: string;
+    audioPathTemplate?: (value: string) => string;
+  }>;
+  mappings: Array<Record<string, string>>;
+}): QuizContent {
+  const items: QuizItem[] = config.mappings.map((mapping, index) => ({
+    id: `item-${index}`,
+    ...mapping,
+  }));
+
+  return {
+    title: config.title,
+    subtitle: config.subtitle,
+    items,
+    fields: config.fields,
+    mode: config.mode,
+  };
+}
+
+interface QuizAppProps {
+  content: QuizContent;
+}
+
+const QuizApp: React.FC<QuizAppProps> = ({ content }) => {
+  const [currentItem, setCurrentItem] = useState<QuizItem | null>(null);
+  const [options, setOptions] = useState<QuizItem[]>([]);
   const [score, setScore] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<Pair | null>(null);
-  const [isPlaying, setIsPlaying] = useState<'khmer' | 'thai' | null>(null);
+  const [selectedOption, setSelectedOption] = useState<QuizItem | null>(null);
+  const [isPlaying, setIsPlaying] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Utility function to shuffle and load a new question
   const loadNewQuestion = useCallback(() => {
-    const randomPair = pairs[Math.floor(Math.random() * pairs.length)];
-    setCurrentPair(randomPair);
+    const randomItem = content.items[Math.floor(Math.random() * content.items.length)];
+    setCurrentItem(randomItem);
 
-    // Generate options (correct + random wrong answers) as Pair objects
-    const wrongAnswers = pairs
-      .filter((pair) => pair.thai !== randomPair.thai)
+    // Generate options (correct + random wrong answers)
+    const wrongAnswers = content.items
+      .filter((item) => item.id !== randomItem.id)
       .sort(() => 0.5 - Math.random())
       .slice(0, 3);
 
-    const correctOption = randomPair;
-    const allOptions = [...wrongAnswers, correctOption].sort(() => 0.5 - Math.random());
+    const allOptions = [...wrongAnswers, randomItem].sort(() => 0.5 - Math.random());
     setOptions(allOptions);
     setSelectedOption(null);
-  }, []);
+  }, [content]);
 
   useEffect(() => {
     loadNewQuestion();
   }, [loadNewQuestion]);
 
-  const isSamePair = (a: Pair | null | undefined, b: Pair | null | undefined) =>
-    !!a && !!b && a.khmer === b.khmer && a.thai === b.thai;
+  const isSameItem = (a: QuizItem | null | undefined, b: QuizItem | null | undefined) =>
+    !!a && !!b && a.id === b.id;
 
   const handleAnswer = useCallback(
-    (answer: Pair) => {
-      if (!currentPair) return;
+    (answer: QuizItem) => {
+      if (!currentItem) return;
 
       setSelectedOption(answer);
 
-      if (isSamePair(answer, currentPair)) {
+      if (isSameItem(answer, currentItem)) {
         setScore((prev) => prev + 1);
       }
 
@@ -79,12 +98,12 @@ const QuizApp: React.FC = () => {
         loadNewQuestion();
       }, 1000);
     },
-    [currentPair, loadNewQuestion]
+    [currentItem, loadNewQuestion]
   );
 
   const playAudio = useCallback(
-    (language: 'khmer' | 'thai') => {
-      if (isPlaying === language) {
+    (identifier: string, targetItem?: QuizItem) => {
+      if (isPlaying === identifier) {
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current = null;
@@ -93,97 +112,171 @@ const QuizApp: React.FC = () => {
         return;
       }
 
-      if (currentPair) {
-        const audio = new Audio(
-          `data/${language}-alphabet/${language === 'khmer' ? currentPair.khmer : currentPair.thai}.mp3`
-        );
-        audioRef.current = audio;
-        audio.play();
-        setIsPlaying(language);
+      // Parse identifier: could be just 'fieldName' or 'fieldName-itemId'
+      const fieldName = identifier.includes('-') ? identifier.split('-')[0] : identifier;
+      const itemToPlay = targetItem || currentItem;
 
-        audio.onended = () => {
-          setIsPlaying(null);
-          audioRef.current = null;
-        };
+      if (itemToPlay) {
+        const field = content.fields.find((f) => f.name === fieldName);
+        if (field && field.audioPathTemplate) {
+          const audioPath = field.audioPathTemplate(itemToPlay[fieldName]);
+          const audio = new Audio(audioPath);
+          audioRef.current = audio;
+          audio.play();
+          setIsPlaying(identifier);
+
+          audio.onended = () => {
+            setIsPlaying(null);
+            audioRef.current = null;
+          };
+        }
       }
     },
-    [currentPair, isPlaying]
+    [currentItem, isPlaying, content]
   );
 
   return (
     <Box sx={{ maxWidth: 600, mx: 'auto' }}>
       <Paper elevation={4} sx={{ p: 4, textAlign: 'center' }}>
         <Typography variant="h4" component="h1" gutterBottom>
-          Khmer-Thai Alphabet Quiz
+          {content.title}
         </Typography>
         <Typography variant="subtitle1" gutterBottom>
-          Listen to the audio and select the correct pair
+          {content.subtitle}
         </Typography>
 
-        {currentPair && (
+        {currentItem && (
           <Box sx={{ mt: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 2 }}>
-              <Button
-                variant="contained"
-                onClick={() => playAudio('khmer')}
-                sx={{ minWidth: 120 }}
-                startIcon={isPlaying === 'khmer' ? <Pause /> : <PlayArrow />}
-                aria-label="Play Khmer audio"
-              >
-                Khmer
-              </Button>
-              <Button
-                variant="contained"
-                onClick={() => playAudio('thai')}
-                sx={{ minWidth: 120 }}
-                startIcon={isPlaying === 'thai' ? <Pause /> : <PlayArrow />}
-                aria-label="Play Thai audio"
-              >
-                Thai
-              </Button>
-            </Box>
-
-            <Grid container spacing={2}>
-              {options.map((option) => {
-                const correctOption = currentPair ? currentPair : null;
-                const isCorrect = isSamePair(correctOption, option);
-                const isSelected = isSamePair(selectedOption, option);
-                let bg: any = undefined;
-                let color: any = undefined;
-
-                if (selectedOption) {
-                  if (isCorrect) {
-                    bg = 'success.main';
-                    color = 'common.white';
-                  } else if (isSelected) {
-                    bg = 'error.main';
-                    color = 'common.white';
-                  }
-                }
-
-                return (
-                  <Grid size={6} key={`${option.khmer}_${option.thai}`}>
+            {content.mode === 'sound-to-character' ? (
+              <>
+                {/* Sound-to-Character: Audio buttons at top, character options below */}
+                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mb: 2 }}>
+                  {content.fields.map((field) => (
                     <Button
-                      variant="outlined"
-                      fullWidth
-                      onClick={() => handleAnswer(option)}
-                      sx={{
-                        fontSize: 32,
-                        bgcolor: bg,
-                        color,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                      }}
-                      disabled={!!selectedOption}
+                      key={field.name}
+                      variant="contained"
+                      onClick={() => playAudio(field.name)}
+                      sx={{ minWidth: 120 }}
+                      startIcon={isPlaying === field.name ? <Pause /> : <PlayArrow />}
+                      aria-label={`Play ${field.label} audio`}
+                      disabled={!field.audioPathTemplate}
                     >
-                      <span>{option.khmer}</span>
-                      <span>{option.thai}</span>
+                      {field.label}
                     </Button>
-                  </Grid>
-                );
-              })}
-            </Grid>
+                  ))}
+                </Box>
+
+                <Grid container spacing={2}>
+                  {options.map((option) => {
+                    const isCorrect = isSameItem(currentItem, option);
+                    const isSelected = isSameItem(selectedOption, option);
+                    let bg: any = undefined;
+                    let color: any = undefined;
+
+                    if (selectedOption) {
+                      if (isCorrect) {
+                        bg = 'success.main';
+                        color = 'common.white';
+                      } else if (isSelected) {
+                        bg = 'error.main';
+                        color = 'common.white';
+                      }
+                    }
+
+                    return (
+                      <Grid size={6} key={option.id}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          onClick={() => handleAnswer(option)}
+                          sx={{
+                            fontSize: 32,
+                            bgcolor: bg,
+                            color,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                          }}
+                          disabled={!!selectedOption}
+                        >
+                          {content.fields.map((field) => (
+                            <span key={field.name}>{option[field.name]}</span>
+                          ))}
+                        </Button>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </>
+            ) : (
+              <>
+                {/* Character-to-Sound: Show character as question, audio buttons as answers */}
+                <Box sx={{ mb: 3, p: 3, bgcolor: 'grey.100', borderRadius: 2 }}>
+                  <Typography variant="h2" sx={{ fontSize: 64 }}>
+                    {content.fields.map((field) => currentItem[field.name]).join(' ')}
+                  </Typography>
+                </Box>
+
+                <Grid container spacing={2}>
+                  {options.map((option) => {
+                    const isCorrect = isSameItem(currentItem, option);
+                    const isSelected = isSameItem(selectedOption, option);
+                    let bg: any = undefined;
+                    let color: any = undefined;
+
+                    if (selectedOption) {
+                      if (isCorrect) {
+                        bg = 'success.main';
+                        color = 'common.white';
+                      } else if (isSelected) {
+                        bg = 'error.main';
+                        color = 'common.white';
+                      }
+                    }
+
+                    return (
+                      <Grid size={6} key={option.id}>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          onClick={() => handleAnswer(option)}
+                          sx={{
+                            bgcolor: bg,
+                            color,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 1,
+                            py: 2,
+                          }}
+                          disabled={!!selectedOption}
+                        >
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            {content.fields.map((field) => (
+                              field.audioPathTemplate && (
+                                <Button
+                                  key={field.name}
+                                  size="medium"
+                                  variant="contained"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    playAudio(field.name + '-' + option.id, option);
+                                  }}
+                                  startIcon={isPlaying === field.name + '-' + option.id ? <Pause /> : <PlayArrow />}
+                                  sx={{ minWidth: 100 }}
+                                >
+                                  {field.label}
+                                </Button>
+                              )
+                            ))}
+                          </Box>
+                        </Button>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </>
+            )}
           </Box>
         )}
 
