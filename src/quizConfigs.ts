@@ -102,12 +102,44 @@ export const khmerThaiPairReverseQuiz: QuizContent = createQuizContent({
   mappings: alphabetPairs,
 });
 
-// Export all quiz types
-export const quizTypes = [
-  { id: 'thai-sound-char', name: 'Thai: Sound → Character', content: thaiSoundToCharQuiz },
-  { id: 'thai-char-sound', name: 'Thai: Character → Sound', content: thaiCharToSoundQuiz },
-  { id: 'khmer-sound-char', name: 'Khmer: Sound → Character', content: khmerSoundToCharQuiz },
-  { id: 'khmer-char-sound', name: 'Khmer: Character → Sound', content: khmerCharToSoundQuiz },
-  { id: 'khmer-thai-pair', name: 'Khmer-Thai: Sound → Characters', content: khmerThaiPairQuiz },
-  { id: 'khmer-thai-pair-reverse', name: 'Khmer-Thai: Characters → Sound', content: khmerThaiPairReverseQuiz },
+// Quiz category structure
+export interface QuizCategory {
+  id: string;
+  name: string;
+  description?: string;
+  quizzes: {
+    id: string;
+    name: string;
+    content: QuizContent;
+  }[];
+}
+
+export const quizCategories: QuizCategory[] = [
+  {
+    id: 'thai',
+    name: 'Thai',
+    description: 'Practice Thai alphabet',
+    quizzes: [
+      { id: 'thai-sound-char', name: 'Sound → Character', content: thaiSoundToCharQuiz },
+      { id: 'thai-char-sound', name: 'Character → Sound', content: thaiCharToSoundQuiz },
+    ],
+  },
+  {
+    id: 'khmer',
+    name: 'Khmer',
+    description: 'Practice Khmer alphabet',
+    quizzes: [
+      { id: 'khmer-sound-char', name: 'Sound → Character', content: khmerSoundToCharQuiz },
+      { id: 'khmer-char-sound', name: 'Character → Sound', content: khmerCharToSoundQuiz },
+    ],
+  },
+  {
+    id: 'khmer-thai-pairs',
+    name: 'Khmer-Thai Pairs',
+    description: 'Practice both alphabets together',
+    quizzes: [
+      { id: 'khmer-thai-pair', name: 'Sound → Characters', content: khmerThaiPairQuiz },
+      { id: 'khmer-thai-pair-reverse', name: 'Characters → Sound', content: khmerThaiPairReverseQuiz },
+    ],
+  },
 ];
