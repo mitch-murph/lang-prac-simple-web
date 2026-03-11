@@ -1,6 +1,6 @@
 import { createQuizContent } from '../components/QuizApp';
 import type { QuizContent } from '../components/QuizApp';
-import { alphabetPairs, loadThaiAlphabet } from './alphabetData';
+import { loadThaiAlphabet } from './alphabetData';
 
 export async function createThaiSoundToCharQuiz(): Promise<QuizContent> {
   const mappings = await loadThaiAlphabet();
