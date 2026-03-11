@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Button, Typography, Paper, Divider, CircularProgress } from '@mui/material';
-import QuizApp from './QuizApp';
-import type { QuizContent } from './QuizApp';
-import { quizCategories } from './quizConfigs.ts';
+import QuizApp from './components/QuizApp';
+import type { QuizContent } from './components/QuizApp';
+import { quizCategories } from './util/quizConfigs.ts';
 
 const App: React.FC = () => {
   const [selectedQuiz, setSelectedQuiz] = useState<{ categoryIndex: number; quizIndex: number } | null>(null);

@@ -75,8 +75,8 @@ export async function createVietnamesePhrase01Quiz(): Promise<QuizContent> {
     mappings,
   });
 }
-import { createQuizContent } from './QuizApp';
-import type { QuizContent } from './QuizApp';
+import { createQuizContent } from '../components/QuizApp';
+import type { QuizContent } from '../components/QuizApp';
 import { alphabetPairs, loadThaiAlphabet, loadKhmerAlphabet } from './alphabetData';
 
 // 1. Thai sound to character (audio → visual Thai character)
