@@ -12,7 +12,7 @@ export interface QuizItem {
 export interface QuizField {
   name: string; // field name, e.g., 'khmer'
   label: string; // display label for audio button, e.g., 'Khmer'
-  audioPathTemplate?: (value: string) => string; // e.g., (val) => `data/khmer-alphabet/${val}.mp3`
+  audioPathTemplate?: (item: QuizItem) => string; // e.g., (item) => `data/khmer-alphabet/${item.khmer}.mp3`
 }
 
 export interface QuizContent {
@@ -31,7 +31,7 @@ export function createQuizContent(config: {
   fields: Array<{
     name: string;
     label: string;
-    audioPathTemplate?: (value: string) => string;
+    audioPathTemplate?: (item: QuizItem) => string;
   }>;
   mappings: Array<Record<string, string>>;
 }): QuizContent {
@@ -119,7 +119,7 @@ const QuizApp: React.FC<QuizAppProps> = ({ content }) => {
       if (itemToPlay) {
         const field = content.fields.find((f) => f.name === fieldName);
         if (field && field.audioPathTemplate) {
-          const audioPath = field.audioPathTemplate(itemToPlay[fieldName]);
+          const audioPath = field.audioPathTemplate(itemToPlay);
           const audio = new Audio(audioPath);
           audioRef.current = audio;
           audio.play();
@@ -199,9 +199,14 @@ const QuizApp: React.FC<QuizAppProps> = ({ content }) => {
                           }}
                           disabled={!!selectedOption}
                         >
-                          {content.fields.map((field) => (
-                            <span key={field.name}>{option[field.name]}</span>
-                          ))}
+                          {/* Only show English answer for Vietnamese Audio → English quiz */}
+                          {content.title === 'Vietnamese: Audio → English' ? (
+                            <span>{option.english}</span>
+                          ) : (
+                            content.fields.map((field) => (
+                              <span key={field.name}>{option[field.name]}</span>
+                            ))
+                          )}
                         </Button>
                       </Grid>
                     );
