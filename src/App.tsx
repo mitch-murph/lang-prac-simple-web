@@ -1,10 +1,37 @@
-import React, { useState } from 'react';
-import { Box, Button, Typography, Paper, Divider } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Button, Typography, Paper, Divider, CircularProgress } from '@mui/material';
 import QuizApp from './QuizApp';
+import type { QuizContent } from './QuizApp';
 import { quizCategories } from './quizConfigs.ts';
 
 const App: React.FC = () => {
   const [selectedQuiz, setSelectedQuiz] = useState<{ categoryIndex: number; quizIndex: number } | null>(null);
+  const [quizContent, setQuizContent] = useState<QuizContent | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load quiz content when a quiz is selected
+  useEffect(() => {
+    if (selectedQuiz === null) {
+      setQuizContent(null);
+      return;
+    }
+
+    const loadQuiz = async () => {
+      setIsLoading(true);
+      try {
+        const category = quizCategories[selectedQuiz.categoryIndex];
+        const quiz = category.quizzes[selectedQuiz.quizIndex];
+        const content = await quiz.contentLoader();
+        setQuizContent(content);
+      } catch (error) {
+        console.error('Error loading quiz:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadQuiz();
+  }, [selectedQuiz]);
 
   // If no quiz selected, show menu with grouped categories
   if (selectedQuiz === null) {
@@ -53,21 +80,31 @@ const App: React.FC = () => {
   }
 
   // Render selected quiz
-  const category = quizCategories[selectedQuiz.categoryIndex];
-  const quiz = category.quizzes[selectedQuiz.quizIndex];
-  return (
-    <Box>
-      <Box sx={{ textAlign: 'center', mt: 2 }}>
-        <Button
-          variant="outlined"
-          onClick={() => setSelectedQuiz(null)}
-        >
-          ← Back to Quiz Selection
-        </Button>
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress />
       </Box>
-      <QuizApp key={`${selectedQuiz.categoryIndex}-${selectedQuiz.quizIndex}`} content={quiz.content} />
-    </Box>
-  );
+    );
+  }
+
+  if (quizContent) {
+    return (
+      <Box>
+        <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setSelectedQuiz(null)}
+          >
+            ← Back to Quiz Selection
+          </Button>
+        </Box>
+        <QuizApp key={`${selectedQuiz?.categoryIndex}-${selectedQuiz?.quizIndex}`} content={quizContent} />
+      </Box>
+    );
+  }
+
+  return null;
 };
 
 export default App;

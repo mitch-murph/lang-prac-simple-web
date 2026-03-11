@@ -21,3 +21,20 @@ export const alphabetPairs = [
   { khmer: 'ហ', thai: 'ห' },
   { khmer: 'អ', thai: 'อ' }
 ];
+
+// Load CSV data for individual alphabets
+async function loadCsvData(path: string): Promise<string[]> {
+  const response = await fetch(path);
+  const text = await response.text();
+  return text.trim().split('\n').map(line => line.trim()).filter(line => line.length > 0);
+}
+
+export async function loadThaiAlphabet(): Promise<{ thai: string }[]> {
+  const chars = await loadCsvData('data/thai-alphabet/content.csv');
+  return chars.map(thai => ({ thai }));
+}
+
+export async function loadKhmerAlphabet(): Promise<{ khmer: string }[]> {
+  const chars = await loadCsvData('data/khmer-alphabet/content.csv');
+  return chars.map(khmer => ({ khmer }));
+}
