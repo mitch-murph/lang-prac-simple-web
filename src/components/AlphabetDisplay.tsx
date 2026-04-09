@@ -22,7 +22,7 @@ const AlphabetDisplay: React.FC<AlphabetDisplayProps> = ({ title, letters }) => 
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 3, maxWidth: 800, margin: '0 auto' }}>
       <Typography variant="h5" gutterBottom>{title}</Typography>
       <Divider sx={{ mb: 2 }} />
       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2 }}>

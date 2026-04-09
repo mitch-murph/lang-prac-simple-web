@@ -1,6 +1,37 @@
 ﻿import React from 'react';
 import SoundToCharacterQuiz from './SoundToCharacterQuiz';
 import CharacterToSoundQuiz from './CharacterToSoundQuiz';
+import KhmerHandwritingQuiz from './KhmerHandwritingQuiz';
+
+interface HandwritingContent {
+  title: string;
+  subtitle: string;
+  handwriting: true;
+  items: { khmer: string; audio: string }[];
+}
+
+const KhmerHandwritingQuizPage: React.FC<{ content: HandwritingContent }> = ({ content }) => {
+  const [current, setCurrent] = React.useState(0);
+  const [showAnswer, setShowAnswer] = React.useState(false);
+  const [items] = React.useState(() => [...content.items].sort(() => Math.random() - 0.5));
+
+  const handleNext = () => {
+    setCurrent((prev) => (prev + 1) % items.length);
+    setShowAnswer(false);
+  };
+
+  return (
+    <KhmerHandwritingQuiz
+      key={current}
+      audioSrc={items[current].audio}
+      correctCharacter={items[current].khmer}
+      showAnswer={showAnswer}
+      setShowAnswer={setShowAnswer}
+      onNext={handleNext}
+      progress={`${current + 1} / ${items.length}`}
+    />
+  );
+};
 
 // Generic quiz types
 export interface QuizItem {
@@ -52,7 +83,11 @@ interface QuizAppProps {
   content: QuizContent;
 }
 
+
 const QuizApp: React.FC<QuizAppProps> = ({ content }) => {
+  if ((content as any).handwriting) {
+    return <KhmerHandwritingQuizPage content={content as any} />;
+  }
   if (content.mode === 'sound-to-character') {
     return <SoundToCharacterQuiz content={content} />;
   } else if (content.mode === 'character-to-sound') {

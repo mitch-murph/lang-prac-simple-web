@@ -77,6 +77,18 @@ export async function createKhmerThaiPairReverseQuiz(): Promise<QuizContent> {
     mappings: alphabetPairs,
   });
 }
+export async function createKhmerHandwritingQuiz(): Promise<{ title: string; subtitle: string; handwriting: true; items: { khmer: string; audio: string }[] }> {
+  const mappings = await loadKhmerAlphabet();
+  return {
+    title: 'Khmer: Handwriting Practice',
+    subtitle: 'Listen to the audio and write the character on the canvas',
+    handwriting: true,
+    items: mappings.map(item => ({
+      khmer: item.khmer,
+      audio: `data/khmer-alphabet/${item.khmer}.mp3`,
+    })),
+  };
+}
 
 export const khmerQuizCategory = {
   id: 'khmer',
@@ -85,6 +97,7 @@ export const khmerQuizCategory = {
   quizzes: [
     { id: 'khmer-sound-char', name: 'Sound → Character', contentLoader: createKhmerSoundToCharQuiz },
     { id: 'khmer-char-sound', name: 'Character → Sound', contentLoader: createKhmerCharToSoundQuiz },
+    { id: 'khmer-handwriting', name: 'Handwriting Practice', contentLoader: createKhmerHandwritingQuiz },
   ],
 };
 
