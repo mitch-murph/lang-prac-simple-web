@@ -6,7 +6,7 @@ import AppRoutes from './router';
 import { CharactersProvider } from './context/CharactersContext';
 
 const App: React.FC = () => (
-  <BrowserRouter>
+  <BrowserRouter basename={import.meta.env.BASE_URL}>
     <CssBaseline />
     <CharactersProvider>
       <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
