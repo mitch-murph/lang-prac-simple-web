@@ -1,0 +1,49 @@
+name: Deploy learn-khmer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'learn-khmer/**'
+      - '.github/workflows/deploy-learn-khmer.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: learn-khmer
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: learn-khmer/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Sync to S3 under /learn-khmer/ prefix
+        run: |
+          aws s3 sync dist/ s3://${{ secrets.S3_BUCKET_NAME }}/learn-khmer/ \
+            --delete \
+            --exclude "index.html"
+          aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET_NAME }}/learn-khmer/index.html \
+            --cache-control "no-cache, no-store, must-revalidate"
