@@ -10,6 +10,8 @@ interface CharacterCardProps {
   onToggle?: (id: string) => void;
   onPlay?: () => void;
   isPlaying?: boolean;
+  onPlay2?: () => void;
+  isPlaying2?: boolean;
   /** Highlight state for quiz feedback */
   highlight?: 'correct' | 'wrong' | 'none';
   onClick?: () => void;
@@ -29,6 +31,8 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
   onToggle,
   onPlay,
   isPlaying = false,
+  onPlay2,
+  isPlaying2 = false,
   highlight = 'none',
   onClick,
   disabled = false,
@@ -69,9 +73,10 @@ const CharacterCard: React.FC<CharacterCardProps> = ({
             {character.romanization}
           </Typography>
         )}
-        {onPlay && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 0.5 }}>
-            <AudioButton isPlaying={isPlaying} onPlay={onPlay} size="small" />
+        {(onPlay || onPlay2) && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5, mt: 0.5 }}>
+            {onPlay && <AudioButton isPlaying={isPlaying} onPlay={onPlay} size="small" />}
+            {onPlay2 && <AudioButton isPlaying={isPlaying2} onPlay={onPlay2} size="small" />}
           </Box>
         )}
       </CardContent>

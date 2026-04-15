@@ -5,6 +5,8 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import HearingIcon from '@mui/icons-material/Hearing';
 import AbcIcon from '@mui/icons-material/Abc';
 import EditIcon from '@mui/icons-material/Edit';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import StyleIcon from '@mui/icons-material/Style';
 
 const MODES = [
   {
@@ -34,6 +36,20 @@ const MODES = [
     icon: <EditIcon fontSize="large" />,
     path: '/quiz/handwriting',
     color: '#b8180d',
+  },
+  {
+    label: 'Match',
+    description: 'Match characters to their sounds side by side',
+    icon: <CompareArrowsIcon fontSize="large" />,
+    path: '/quiz/match',
+    color: '#e65100',
+  },
+  {
+    label: 'Flashcards',
+    description: 'See a character, recall the sound, then reveal to check',
+    icon: <StyleIcon fontSize="large" />,
+    path: '/quiz/flashcards',
+    color: '#4527a0',
   },
 ];
 

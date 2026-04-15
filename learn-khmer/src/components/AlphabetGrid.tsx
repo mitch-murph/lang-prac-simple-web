@@ -10,6 +10,8 @@ interface AlphabetGridProps {
   onToggle?: (id: string) => void;
   onPlay?: (char: KhmerCharacter) => void;
   playingId?: string | null;
+  onPlay2?: (char: KhmerCharacter) => void;
+  playingId2?: string | null;
   /** Quiz highlight per character id */
   highlights?: Record<string, 'correct' | 'wrong' | 'none'>;
   onCardClick?: (char: KhmerCharacter) => void;
@@ -22,6 +24,8 @@ const AlphabetGrid: React.FC<AlphabetGridProps> = ({
   onToggle,
   onPlay,
   playingId,
+  onPlay2,
+  playingId2,
   highlights,
   onCardClick,
   disabledIds,
@@ -36,6 +40,8 @@ const AlphabetGrid: React.FC<AlphabetGridProps> = ({
           onToggle={onToggle}
           onPlay={onPlay ? () => onPlay(char) : undefined}
           isPlaying={playingId === char.id}
+          onPlay2={onPlay2 ? () => onPlay2(char) : undefined}
+          isPlaying2={playingId2 === char.id}
           highlight={highlights?.[char.id] ?? 'none'}
           onClick={onCardClick ? () => onCardClick(char) : undefined}
           disabled={disabledIds?.has(char.id)}

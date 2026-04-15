@@ -21,7 +21,8 @@ const HandwritingView: React.FC = () => {
   const [score, setScore] = useState(0);
   const [total, setTotal] = useState(0);
   const enabledSet = useEnabledSet();
-  const { play, isPlaying, stop } = useAudio();
+  const { play: play1, isPlaying: isPlaying1, stop: stop1 } = useAudio();
+  const { play: play2, isPlaying: isPlaying2, stop: stop2 } = useAudio();
   const padRef = useRef<HandwritingPadHandle>(null);
 
   const items = useMemo(
@@ -39,10 +40,10 @@ const HandwritingView: React.FC = () => {
 
   const currentItem = queue[index] ?? null;
 
-  // Auto-play audio when question changes
+  // Auto-play audio (voice 1) when question changes
   useEffect(() => {
     if (currentItem) {
-      const t = setTimeout(() => play(currentItem.audioPath), 300);
+      const t = setTimeout(() => play1(currentItem.audioPath), 300);
       return () => clearTimeout(t);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -68,11 +69,19 @@ const HandwritingView: React.FC = () => {
     [queue.length, items]
   );
 
-  const handleReplay = () => {
-    if (isPlaying) {
-      stop();
+  const handleReplay1 = () => {
+    if (isPlaying1) {
+      stop1();
     } else if (currentItem) {
-      play(currentItem.audioPath);
+      play1(currentItem.audioPath);
+    }
+  };
+
+  const handleReplay2 = () => {
+    if (isPlaying2) {
+      stop2();
+    } else if (currentItem?.audioPath2) {
+      play2(currentItem.audioPath2);
     }
   };
 
@@ -106,7 +115,10 @@ const HandwritingView: React.FC = () => {
       </Typography>
 
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, mb: 2 }}>
-        <AudioButton isPlaying={isPlaying} onPlay={handleReplay} size="large" />
+        <AudioButton isPlaying={isPlaying1} onPlay={handleReplay1} size="large" />
+        {currentItem?.audioPath2 && (
+          <AudioButton isPlaying={isPlaying2} onPlay={handleReplay2} size="large" />
+        )}
       </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>

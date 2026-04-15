@@ -7,6 +7,8 @@ import AbcIcon from '@mui/icons-material/Abc';
 import EditIcon from '@mui/icons-material/Edit';
 import HomeIcon from '@mui/icons-material/Home';
 import SettingsIcon from '@mui/icons-material/Settings';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import StyleIcon from '@mui/icons-material/Style';
 import { Link, useLocation } from 'react-router-dom';
 
 const NAV_LINKS = [
@@ -15,6 +17,8 @@ const NAV_LINKS = [
   { label: 'Sound → Char', path: '/quiz/sound-to-char', icon: <HearingIcon fontSize="small" /> },
   { label: 'Char → Sound', path: '/quiz/char-to-sound', icon: <AbcIcon fontSize="small" /> },
   { label: 'Handwriting', path: '/quiz/handwriting', icon: <EditIcon fontSize="small" /> },
+  { label: 'Match', path: '/quiz/match', icon: <CompareArrowsIcon fontSize="small" /> },
+  { label: 'Flashcards', path: '/quiz/flashcards', icon: <StyleIcon fontSize="small" /> },
   { label: 'Settings', path: '/settings', icon: <SettingsIcon fontSize="small" /> },
 ];
 

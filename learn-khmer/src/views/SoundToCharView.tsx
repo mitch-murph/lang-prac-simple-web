@@ -13,7 +13,8 @@ import AudioButton from '../components/AudioButton';
 const SoundToCharView: React.FC = () => {
   const { characters, loading } = useCharacters();
   const enabledSet = useEnabledSet();
-  const { play, isPlaying, stop } = useAudio();
+  const { play: play1, isPlaying: isPlaying1, stop: stop1 } = useAudio();
+  const { play: play2, isPlaying: isPlaying2, stop: stop2 } = useAudio();
   const autoPlayed = useRef(false);
 
   const items = useMemo(
@@ -23,13 +24,14 @@ const SoundToCharView: React.FC = () => {
   const { currentItem, options, selectedOption, isCorrect, score, total, handleAnswer, next } =
     useQuiz({ items });
 
-  // Auto-play when question changes
+  // Auto-play voice 1 when question changes
   useEffect(() => {
     if (!currentItem) return;
     autoPlayed.current = false;
     const t = setTimeout(() => {
-      stop();
-      play(currentItem.audioPath);
+      stop1();
+      stop2();
+      play1(currentItem.audioPath);
       autoPlayed.current = true;
     }, 200);
     return () => clearTimeout(t);
@@ -72,11 +74,20 @@ const SoundToCharView: React.FC = () => {
         <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
           Which character matches this sound?
         </Typography>
-        <AudioButton
-          isPlaying={isPlaying}
-          onPlay={() => currentItem && play(currentItem.audioPath)}
-          size="large"
-        />
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+          <AudioButton
+            isPlaying={isPlaying1}
+            onPlay={() => currentItem && play1(currentItem.audioPath)}
+            size="large"
+          />
+          {currentItem?.audioPath2 && (
+            <AudioButton
+              isPlaying={isPlaying2}
+              onPlay={() => currentItem.audioPath2 && play2(currentItem.audioPath2)}
+              size="large"
+            />
+          )}
+        </Box>
       </Box>
 
       <Grid container spacing={2} justifyContent="center" sx={{ mb: 3 }}>

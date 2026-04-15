@@ -7,18 +7,25 @@ import { useAudio } from '../hooks/useAudio';
 
 const AlphabetView: React.FC = () => {
   const { characters, loading } = useCharacters();
-  const { isPlaying, play } = useAudio();
-  const [playingId, setPlayingId] = useState<string | null>(null);
+  const { isPlaying: isPlaying1, play: play1 } = useAudio();
+  const { isPlaying: isPlaying2, play: play2 } = useAudio();
+  const [playingId1, setPlayingId1] = useState<string | null>(null);
+  const [playingId2, setPlayingId2] = useState<string | null>(null);
 
-  const handlePlay = (char: KhmerCharacter) => {
-    setPlayingId(char.id);
-    play(char.audioPath);
+  const handlePlay1 = (char: KhmerCharacter) => {
+    setPlayingId1(char.id);
+    play1(char.audioPath);
   };
 
-  // Clear playingId when audio stops
-  useEffect(() => {
-    if (!isPlaying) setPlayingId(null);
-  }, [isPlaying]);
+  const handlePlay2 = (char: KhmerCharacter) => {
+    if (!char.audioPath2) return;
+    setPlayingId2(char.id);
+    play2(char.audioPath2);
+  };
+
+  // Clear playingIds when audio stops
+  useEffect(() => { if (!isPlaying1) setPlayingId1(null); }, [isPlaying1]);
+  useEffect(() => { if (!isPlaying2) setPlayingId2(null); }, [isPlaying2]);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}><CircularProgress /></Box>;
 
@@ -32,8 +39,10 @@ const AlphabetView: React.FC = () => {
       </Typography>
       <AlphabetGrid
         characters={characters}
-        onPlay={handlePlay}
-        playingId={playingId}
+        onPlay={handlePlay1}
+        playingId={playingId1}
+        onPlay2={handlePlay2}
+        playingId2={playingId2}
       />
     </Box>
   );

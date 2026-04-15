@@ -13,9 +13,11 @@ import { useEnabledSet } from '../store/settingsStore';
 const CharToSoundView: React.FC = () => {
   const { characters, loading } = useCharacters();
   const enabledSet = useEnabledSet();
-  const { play, isPlaying, stop } = useAudio();
+  const { play: play1, stop: stop1 } = useAudio();
+  const { play: play2, stop: stop2 } = useAudio();
   // Track which option id is currently playing so each button shows its own state
-  const [playingId, setPlayingId] = React.useState<string | null>(null);
+  const [playingId1, setPlayingId1] = React.useState<string | null>(null);
+  const [playingId2, setPlayingId2] = React.useState<string | null>(null);
 
   const items = useMemo(
     () => characters.filter((c) => enabledSet.has(c.id)),
@@ -24,17 +26,14 @@ const CharToSoundView: React.FC = () => {
   const { currentItem, options, selectedOption, isCorrect, score, total, handleAnswer, next } =
     useQuiz({ items });
 
-  // Stop audio and clear playingId when moving to new question
+  // Stop audio and clear playingIds when moving to new question
   useEffect(() => {
-    stop();
-    setPlayingId(null);
+    stop1();
+    stop2();
+    setPlayingId1(null);
+    setPlayingId2(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentItem?.id]);
-
-  // Clear playingId when audio finishes
-  useEffect(() => {
-    if (!isPlaying) setPlayingId(null);
-  }, [isPlaying]);
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 8 }}><CircularProgress /></Box>;
   if (items.length < 4)
@@ -51,13 +50,24 @@ const CharToSoundView: React.FC = () => {
     return 'divider';
   };
 
-  const handlePlay = (opt: KhmerCharacter) => {
-    if (playingId === opt.id) {
-      stop();
-      setPlayingId(null);
+  const handlePlay1 = (opt: KhmerCharacter) => {
+    if (playingId1 === opt.id) {
+      stop1();
+      setPlayingId1(null);
     } else {
-      setPlayingId(opt.id);
-      play(opt.audioPath);
+      setPlayingId1(opt.id);
+      play1(opt.audioPath);
+    }
+  };
+
+  const handlePlay2 = (opt: KhmerCharacter) => {
+    if (!opt.audioPath2) return;
+    if (playingId2 === opt.id) {
+      stop2();
+      setPlayingId2(null);
+    } else {
+      setPlayingId2(opt.id);
+      play2(opt.audioPath2);
     }
   };
 
@@ -107,25 +117,46 @@ const CharToSoundView: React.FC = () => {
                 opacity: selectedOption && opt.id !== currentItem?.id && opt.id !== selectedOption.id ? 0.5 : 1,
               }}
             >
-              {/* Audio play button — stopPropagation so clicking it doesn't also submit answer */}
-              <Box
-                component="span"
-                onClick={(e) => { e.stopPropagation(); handlePlay(opt); }}
-                sx={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 48,
-                  height: 48,
-                  borderRadius: '50%',
-                  bgcolor: 'primary.main',
-                  color: 'white',
-                  cursor: 'pointer',
-                  mb: 1,
-                  '&:hover': { bgcolor: 'primary.dark' },
-                }}
-              >
-                {playingId === opt.id ? <StopIcon /> : <VolumeUpIcon />}
+              {/* Audio play buttons — stopPropagation so clicking doesn't also submit answer */}
+              <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5, mb: 1 }}>
+                <Box
+                  component="span"
+                  onClick={(e) => { e.stopPropagation(); handlePlay1(opt); }}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 44,
+                    height: 44,
+                    borderRadius: '50%',
+                    bgcolor: 'primary.main',
+                    color: 'white',
+                    cursor: 'pointer',
+                    '&:hover': { bgcolor: 'primary.dark' },
+                  }}
+                >
+                  {playingId1 === opt.id ? <StopIcon /> : <VolumeUpIcon />}
+                </Box>
+                {opt.audioPath2 && (
+                  <Box
+                    component="span"
+                    onClick={(e) => { e.stopPropagation(); handlePlay2(opt); }}
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 44,
+                      height: 44,
+                      borderRadius: '50%',
+                      bgcolor: 'secondary.main',
+                      color: 'white',
+                      cursor: 'pointer',
+                      '&:hover': { bgcolor: 'secondary.dark' },
+                    }}
+                  >
+                    {playingId2 === opt.id ? <StopIcon /> : <VolumeUpIcon />}
+                  </Box>
+                )}
               </Box>
 
               {/* Before answering: show option number. After: reveal character */}

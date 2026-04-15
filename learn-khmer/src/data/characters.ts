@@ -2,6 +2,7 @@ export interface KhmerCharacter {
   id: string;
   character: string;
   audioPath: string;
+  audioPath2?: string;
   romanization?: string;
 }
 
@@ -19,5 +20,6 @@ export async function loadCharacters(base = '/'): Promise<KhmerCharacter[]> {
     id: char,
     character: char,
     audioPath: `${base}data/khmer-alphabet/${char}.mp3`,
+    audioPath2: `${base}data/khmer-alphabet-2/${char}.mp3`,
   }));
 }
