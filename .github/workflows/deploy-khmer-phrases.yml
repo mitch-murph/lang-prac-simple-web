@@ -6,6 +6,7 @@ on:
     paths:
       - 'khmer-phrases/index.html'
       - 'khmer-phrases/admin.html'
+      - 'khmer-phrases/khmer_phrases.csv'
       - 'khmer-phrases/khmer_phrases_filtered.csv'
       - 'khmer-phrases/audio/**'
       - '.github/workflows/deploy-khmer-phrases.yml'
@@ -32,6 +33,7 @@ jobs:
             --delete \
             --exclude "*" \
             --include "audio/**" \
+            --include "khmer_phrases.csv" \
             --include "khmer_phrases_filtered.csv" \
             --include "admin.html"
           aws s3 cp khmer-phrases/index.html s3://${{ secrets.S3_BUCKET_NAME }}/khmer-phrases/index.html \
