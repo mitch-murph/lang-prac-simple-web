@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Khmer Admin</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #222; }
+  .page-wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  #content { padding-bottom: 40px; }
+  header { background: #1a1a2e; color: #fff; padding: 18px 24px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 1.2rem; font-weight: 600; }
+  #stats { font-size: 0.9rem; opacity: 0.8; }
+  #actions { padding: 0 24px 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+  button { padding: 8px 18px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600; }
+  #export-btn { background: #2d6a4f; color: #fff; }
+  #export-btn:hover { background: #1b4332; }
+  #select-all-btn { background: #457b9d; color: #fff; }
+  #select-all-btn:hover { background: #1d3557; }
+  #deselect-all-btn { background: #e63946; color: #fff; }
+  #deselect-all-btn:hover { background: #b5000a; }
+  #content { padding: 0 24px 40px; }
+  .category-block { background: #fff; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden; }
+  .category-header { background: #1a1a2e; color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+  .category-header h2 { font-size: 1rem; font-weight: 600; }
+  .cat-controls { display: flex; gap: 8px; }
+  .cat-btn { padding: 4px 12px; border: 1px solid rgba(255,255,255,0.4); border-radius: 4px; background: transparent; color: #fff; font-size: 0.8rem; cursor: pointer; }
+  .cat-btn:hover { background: rgba(255,255,255,0.15); }
+  .category-body { display: block; }
+  .category-body.collapsed { display: none; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: #f0f0f0; padding: 8px 12px; text-align: left; font-size: 0.82rem; color: #555; border-bottom: 1px solid #ddd; }
+  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; }
+  tbody tr:hover { background: #f9f9f9; }
+  tbody tr.deselected { opacity: 0.35; }
+  td { padding: 9px 12px; font-size: 0.9rem; vertical-align: middle; }
+  td.check-col { width: 40px; text-align: center; }
+  td.english { font-weight: 500; }
+  td.khmer { font-family: 'Khmer', 'Noto Sans Khmer', sans-serif; font-size: 1rem; }
+  td.phonetic { color: #555; font-style: italic; }
+  td.play-col { width: 42px; text-align: center; }
+  .play-btn { background: none; border: none; cursor: pointer; font-size: 1.3rem; padding: 2px 4px; line-height: 1; border-radius: 4px; transition: transform 0.1s; }
+  .play-btn:hover { transform: scale(1.2); }
+  .play-btn.playing { color: #2d6a4f; }
+  input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #2d6a4f; }
+  #drill-settings { padding: 10px 0; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 0.88rem; color: #444; }
+  #drill-settings label { display: flex; align-items: center; gap: 8px; }
+  #drill-settings input[type=range] { width: 120px; cursor: pointer; accent-color: #1a1a2e; }
+  #drill-settings span { font-weight: 600; min-width: 36px; display: inline-block; }
+  td.drill-col { width: 42px; text-align: center; }
+  td.play-drill-col { width: 42px; text-align: center; }
+  .drill-btn { background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 2px 4px; line-height: 1; border-radius: 4px; transition: transform 0.1s; }
+  .drill-btn:hover { transform: scale(1.2); }
+  .drill-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>🇰🇭 Khmer — Admin</h1>
+  <div style="display:flex;align-items:center;gap:20px;margin-left:auto">
+    <span id="stats">Loading...</span>
+    <a href="/index.html" style="color:#fff;opacity:0.85;font-size:0.9rem;text-decoration:none;border:1px solid rgba(255,255,255,0.4);padding:5px 14px;border-radius:6px;">Viewer →</a>
+  </div>
+</header>
+
+<div id="actions" style="display:none;padding:16px 24px;gap:10px;flex-wrap:wrap;align-items:center;flex-direction:column" class="page-wrap">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;width:100%">
+    <button id="select-all-btn" onclick="toggleAll(true)">Show All</button>
+    <button id="deselect-all-btn" onclick="toggleAll(false)">Hide All</button>
+    <button id="export-btn" onclick="exportCsv()">⬇ Export khmer_phrases_filtered.csv</button>
+  </div>
+  <div id="drill-settings">
+    <strong>Drill settings:</strong>
+    <label>
+      Slow speed:
+      <input type="range" id="slow-speed" min="0.40" max="0.95" value="0.87" step="0.01" oninput="document.getElementById('slow-speed-val').textContent=Math.round(this.value*100)+'%'">
+      <span id="slow-speed-val">87%</span>
+    </label>
+    <label>
+      Pause (s):
+      <input type="range" id="pause-dur" min="0.5" max="4" value="2" step="0.1" oninput="document.getElementById('pause-dur-val').textContent=this.value+'s'">
+      <span id="pause-dur-val">2s</span>
+    </label>
+  </div>
+</div>
+
+<div id="content" class="page-wrap">
+  <div id="loading">Loading phrases...</div>
+</div>
+
+<script>
+let allRows = [];
+let currentAudio = null;
+let currentPlayId = null;
+
+// Auto-fetch CSV from server, then seed visibility from filtered CSV if no sessionStorage
+async function init() {
+  let baseText;
+  try {
+    const r = await fetch('/khmer_phrases.csv');
+    if (!r.ok) throw new Error();
+    baseText = await r.text();
+  } catch(e) {
+    document.getElementById('loading').textContent = '❌ Could not load khmer_phrases.csv — make sure the server is running (npm start).';
+    return;
+  }
+
+  // If no sessionStorage yet, try to seed visibility from khmer_phrases_filtered.csv
+  const hasSaved = (() => { try { return !!JSON.parse(sessionStorage.getItem('khmer_visibility') || 'null'); } catch(e) { return false; } })();
+  if (!hasSaved) {
+    try {
+      const r2 = await fetch('/khmer_phrases_filtered.csv');
+      if (r2.ok) {
+        const filtText = await r2.text();
+        const [, ...filtRows] = parseCsv(filtText);
+        // Build a visibility map keyed by row index (same order as base CSV)
+        const visMap = {};
+        filtRows.forEach((fr, i) => { visMap[i] = String(fr[5]).toLowerCase() !== 'false'; });
+        sessionStorage.setItem('khmer_visibility', JSON.stringify(visMap));
+      }
+    } catch(e) { /* filtered CSV absent — no problem, defaults to all visible */ }
+  }
+
+  parseAndRender(baseText);
+}
+init();
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const rows = [];
+  for (const line of lines) {
+    const fields = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; }
+        else inQ = !inQ;
+      } else if (c === ',' && !inQ) {
+        fields.push(cur); cur = '';
+      } else cur += c;
+    }
+    fields.push(cur);
+    rows.push(fields);
+  }
+  return rows;
+}
+
+function parseAndRender(text) {
+  const rows = parseCsv(text);
+  if (rows.length < 2) return;
+  const [header, ...data] = rows;
+  allRows = data.map((r, i) => ({
+    id: i,
+    category: r[0] || '',
+    english:  r[1] || '',
+    khmer:    r[2] || '',
+    phonetic: r[3] || '',
+    audioFile: r[4] || '',
+    visible: true,
+  }));
+
+  // Restore saved visibility from sessionStorage
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('khmer_visibility') || 'null');
+    if (saved) allRows.forEach(r => { if (r.id in saved) r.visible = saved[r.id]; });
+  } catch(e) {}
+
+  updateStats();
+  document.getElementById('actions').style.display = 'flex';
+  document.getElementById('loading').style.display = 'none';
+  renderCategories();
+}
+
+function renderCategories() {
+  const grouped = {};
+  for (const row of allRows) {
+    if (!grouped[row.category]) grouped[row.category] = [];
+    grouped[row.category].push(row);
+  }
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+
+  for (const [cat, rows] of Object.entries(grouped)) {
+    const block = document.createElement('div');
+    block.className = 'category-block';
+    block.innerHTML = `
+      <div class="category-header" onclick="toggleCollapse(this)">
+        <h2>${cat} <span style="opacity:0.6;font-weight:400;font-size:0.85rem">(${rows.length} phrases)</span></h2>
+        <div class="cat-controls" onclick="event.stopPropagation()">
+          <button class="cat-btn" onclick="toggleCat('${cat}', true)">All</button>
+          <button class="cat-btn" onclick="toggleCat('${cat}', false)">None</button>
+        </div>
+      </div>
+      <div class="category-body">
+        <table>
+          <thead><tr>
+            <th class="play-col" title="Play">▶</th>
+            <th class="play-drill-col" title="Play drill">🔁</th>
+            <th class="drill-col" title="Download drill audio">⬇</th>
+            <th class="check-col">✓</th>
+            <th>English</th>
+            <th>Khmer</th>
+            <th>Phonetic</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr id="row-${row.id}" class="${row.visible ? '' : 'deselected'}">
+                <td class="play-col">${row.audioFile ? `<button class="play-btn" id="play-${row.id}" onclick="playAudio(${row.id})">▶</button>` : ''}</td>
+                <td class="play-drill-col">${row.audioFile ? `<button class="drill-btn" id="play-drill-${row.id}" onclick="playDrill(${row.id})" title="Play drill">🔁</button>` : ''}</td>
+                <td class="drill-col">${row.audioFile ? `<button class="drill-btn" id="drill-${row.id}" onclick="downloadDrill(${row.id})" title="Download drill audio">⬇</button>` : ''}</td>
+                <td class="check-col"><input type="checkbox" ${row.visible ? 'checked' : ''} onchange="toggleRow(${row.id}, this.checked)"></td>
+                <td class="english">${escHtml(row.english)}</td>
+                <td class="khmer">${escHtml(row.khmer)}</td>
+                <td class="phonetic">${escHtml(row.phonetic)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    content.appendChild(block);
+  }
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function playAudio(id) {
+  const row = allRows.find(r => r.id === id);
+  if (!row || !row.audioFile) return;
+  // Toggle off if same track
+  if (currentPlayId === id) {
+    currentAudio.pause();
+    document.getElementById('play-' + id).textContent = '▶';
+    document.getElementById('play-' + id).classList.remove('playing');
+    currentAudio = null; currentPlayId = null;
+    return;
+  }
+  // Stop previous
+  if (currentAudio) {
+    currentAudio.pause();
+    const prev = document.getElementById('play-' + currentPlayId);
+    if (prev) { prev.textContent = '▶'; prev.classList.remove('playing'); }
+  }
+  const btn = document.getElementById('play-' + id);
+  const audio = new Audio('/audio/' + row.audioFile.replace(/\\/g, '/'));
+  audio.play();
+  btn.textContent = '⏹'; btn.classList.add('playing');
+  currentAudio = audio; currentPlayId = id;
+  audio.onended = () => { btn.textContent = '▶'; btn.classList.remove('playing'); currentAudio = null; currentPlayId = null; };
+}
+
+function saveVisibility() {
+  const map = {};
+  allRows.forEach(r => { map[r.id] = r.visible; });
+  sessionStorage.setItem('khmer_visibility', JSON.stringify(map));
+}
+
+function toggleRow(id, checked) {
+  allRows.find(r => r.id === id).visible = checked;
+  const tr = document.getElementById('row-' + id);
+  tr.classList.toggle('deselected', !checked);
+  saveVisibility();
+  updateStats();
+}
+
+function toggleCat(cat, val) {
+  allRows.filter(r => r.category === cat).forEach(r => {
+    r.visible = val;
+    const tr = document.getElementById('row-' + r.id);
+    if (tr) {
+      tr.classList.toggle('deselected', !val);
+      tr.querySelector('input[type="checkbox"]').checked = val;
+    }
+  });
+  saveVisibility();
+  updateStats();
+}
+
+function toggleAll(val) {
+  allRows.forEach(r => {
+    r.visible = val;
+    const tr = document.getElementById('row-' + r.id);
+    if (tr) {
+      tr.classList.toggle('deselected', !val);
+      tr.querySelector('input[type="checkbox"]').checked = val;
+    }
+  });
+  saveVisibility();
+  updateStats();
+}
+
+function updateStats() {
+  const vis = allRows.filter(r => r.visible).length;
+  const cats = [...new Set(allRows.map(r => r.category))].length;
+  document.getElementById('stats').textContent = `${vis} / ${allRows.length} visible · ${cats} categories`;
+}
+
+// ── Drill audio ──────────────────────────────────────────────────────────────
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+async function loadAudioBuffer(url) {
+  const res = await fetch(url);
+  const arrayBuf = await res.arrayBuffer();
+  return await audioCtx.decodeAudioData(arrayBuf);
+}
+
+function createSilence(seconds, sampleRate) {
+  const buf = audioCtx.createBuffer(1, Math.floor(seconds * sampleRate), sampleRate);
+  return buf; // channels are zeroed by default
+}
+
+function stretchBuffer(buf, speed) {
+  // Simple linear interpolation to change playback speed
+  const srcData = buf.getChannelData(0);
+  const outLen = Math.floor(srcData.length / speed);
+  const out = audioCtx.createBuffer(1, outLen, buf.sampleRate);
+  const outData = out.getChannelData(0);
+  for (let i = 0; i < outLen; i++) {
+    const srcPos = i * speed;
+    const lo = Math.floor(srcPos);
+    const hi = Math.min(lo + 1, srcData.length - 1);
+    const frac = srcPos - lo;
+    outData[i] = srcData[lo] * (1 - frac) + srcData[hi] * frac;
+  }
+  return out;
+}
+
+function concatBuffers(buffers, sampleRate) {
+  const totalLen = buffers.reduce((s, b) => s + b.length, 0);
+  const out = audioCtx.createBuffer(1, totalLen, sampleRate);
+  const outData = out.getChannelData(0);
+  let offset = 0;
+  for (const buf of buffers) {
+    const ch = buf.numberOfChannels === 1
+      ? buf.getChannelData(0)
+      : (() => { const a = buf.getChannelData(0), b2 = buf.getChannelData(1), m = new Float32Array(buf.length); for (let i=0;i<buf.length;i++) m[i]=(a[i]+b2[i])/2; return m; })();
+    outData.set(ch, offset);
+    offset += buf.length;
+  }
+  return out;
+}
+
+function encodeToMp3(buffer) {
+  const samples = buffer.getChannelData(0);
+  const encoder = new lamejs.Mp3Encoder(1, buffer.sampleRate, 128);
+  const blockSize = 1152;
+  const mp3Data = [];
+  for (let i = 0; i < samples.length; i += blockSize) {
+    const slice = samples.subarray(i, i + blockSize);
+    const int16 = new Int16Array(slice.length);
+    for (let j = 0; j < slice.length; j++) {
+      int16[j] = Math.max(-1, Math.min(1, slice[j])) * 32767;
+    }
+    const chunk = encoder.encodeBuffer(int16);
+    if (chunk.length > 0) mp3Data.push(new Uint8Array(chunk));
+  }
+  const end = encoder.flush();
+  if (end.length > 0) mp3Data.push(new Uint8Array(end));
+  return new Blob(mp3Data, { type: 'audio/mp3' });
+}
+
+async function buildDrillBuffer(row) {
+  const speed = parseFloat(document.getElementById('slow-speed').value);
+  const pauseDur = parseFloat(document.getElementById('pause-dur').value);
+  const url = '/audio/' + row.audioFile.replace(/\\/g, '/');
+  const normalBuf = await loadAudioBuffer(url);
+  const sr = normalBuf.sampleRate;
+  const slowBuf = stretchBuffer(normalBuf, speed);
+  const pause = createSilence(pauseDur, sr);
+  const shortPause = createSilence(1, sr);
+  return concatBuffers([
+    shortPause, normalBuf,
+    pause, slowBuf,
+    pause, normalBuf,
+    shortPause
+  ], sr);
+}
+
+let currentDrillSource = null;
+let currentDrillId = null;
+
+async function playDrill(id) {
+  const row = allRows.find(r => r.id === id);
+  if (!row || !row.audioFile) return;
+  const btn = document.getElementById('play-drill-' + id);
+
+  // Stop if same
+  if (currentDrillId === id && currentDrillSource) {
+    currentDrillSource.stop();
+    currentDrillSource = null; currentDrillId = null;
+    btn.textContent = '🔁'; btn.classList.remove('playing');
+    return;
+  }
+  // Stop previous
+  if (currentDrillSource) {
+    currentDrillSource.stop();
+    const prev = document.getElementById('play-drill-' + currentDrillId);
+    if (prev) { prev.textContent = '🔁'; prev.classList.remove('playing'); }
+    currentDrillSource = null; currentDrillId = null;
+  }
+
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const combined = await buildDrillBuffer(row);
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const source = audioCtx.createBufferSource();
+    source.buffer = combined;
+    source.connect(audioCtx.destination);
+    source.start();
+    btn.disabled = false; btn.textContent = '⏹'; btn.classList.add('playing');
+    currentDrillSource = source; currentDrillId = id;
+    source.onended = () => {
+      btn.textContent = '🔁'; btn.classList.remove('playing');
+      if (currentDrillId === id) { currentDrillSource = null; currentDrillId = null; }
+    };
+  } catch(e) {
+    alert('Failed to play drill: ' + e.message);
+    btn.disabled = false; btn.textContent = '🔁';
+  }
+}
+
+async function downloadDrill(id) {
+  const row = allRows.find(r => r.id === id);
+  if (!row || !row.audioFile) return;
+  const btn = document.getElementById('drill-' + id);
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  try {
+    const combined = await buildDrillBuffer(row);
+    const mp3Blob = encodeToMp3(combined);
+    const safeName = row.audioFile.replace(/\\/g, '/').split('/').pop().replace(/\.mp3$/i, '') + ' [drill].mp3';
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(mp3Blob);
+    a.download = safeName;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch(e) {
+    alert('Failed to create drill audio: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⬇';
+  }
+}
+
+function toggleCollapse(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('collapsed');
+}
+
+function exportCsv() {
+  // Export ALL rows with Visible column — drop this file into the directory for S3
+  const header = ['Category','English','Khmer','Phonetic','AudioFile','Visible'];
+  const rows = [header, ...allRows.map(r => [r.category, r.english, r.khmer, r.phonetic, r.audioFile, r.visible])];
+  const csv = rows.map(r => r.map(f => '"' + String(f).replace(/"/g, '""') + '"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+  a.download = 'khmer_phrases_filtered.csv';
+  a.click();
+}
+</script>
+</body>
+</html>

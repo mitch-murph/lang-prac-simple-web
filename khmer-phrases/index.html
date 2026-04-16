@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Khmer Phrases</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #222; }
+  .page-wrap { max-width: 960px; margin: 0 auto; padding: 0 24px; }
+  header { background: #1a1a2e; color: #fff; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  header h1 { font-size: 1.2rem; font-weight: 600; }
+  #stats { font-size: 0.9rem; opacity: 0.8; }
+  #drill-bar { padding: 12px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; }
+  #drill-settings { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 0.88rem; color: #444; }
+  #drill-settings label { display: flex; align-items: center; gap: 8px; }
+  #drill-settings input[type=range] { width: 120px; cursor: pointer; accent-color: #1a1a2e; }
+  #drill-settings span { font-weight: 600; min-width: 36px; display: inline-block; }
+  #content { padding: 24px 0 40px; }
+  .category-block { background: #fff; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden; }
+  .category-header { background: #1a1a2e; color: #fff; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+  .category-header h2 { font-size: 1rem; font-weight: 600; }
+  .category-body { display: block; }
+  .category-body.collapsed { display: none; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { background: #f0f0f0; padding: 8px 12px; text-align: left; font-size: 0.82rem; color: #555; border-bottom: 1px solid #ddd; }
+  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; }
+  tbody tr:hover { background: #f9f9f9; }
+  td { padding: 9px 12px; font-size: 0.9rem; vertical-align: middle; }
+  td.play-col, td.drill-col { width: 42px; text-align: center; }
+  td.english { font-weight: 500; }
+  td.khmer { font-family: 'Khmer', 'Noto Sans Khmer', sans-serif; font-size: 1rem; }
+  td.phonetic { color: #555; font-style: italic; }
+  .play-btn { background: none; border: none; cursor: pointer; font-size: 1.3rem; padding: 2px 4px; line-height: 1; border-radius: 4px; transition: transform 0.1s; }
+  .play-btn:hover { transform: scale(1.2); }
+  .play-btn.playing { color: #2d6a4f; }
+  .drill-btn { background: none; border: none; cursor: pointer; font-size: 1.1rem; padding: 2px 4px; line-height: 1; border-radius: 4px; transition: transform 0.1s; }
+  .drill-btn:hover { transform: scale(1.2); }
+  .drill-btn.playing { color: #2d6a4f; }
+  .admin-link { color: #fff; opacity: 0.8; font-size: 0.9rem; text-decoration: none; border: 1px solid rgba(255,255,255,0.4); padding: 5px 14px; border-radius: 6px; }
+  .admin-link:hover { opacity: 1; }
+  #loading { padding: 60px 24px; text-align: center; color: #888; }
+  #progress-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; align-items:center; justify-content:center; }
+  #progress-overlay.active { display:flex; }
+  #progress-box { background:#fff; border-radius:12px; padding:28px 36px; min-width:320px; text-align:center; }
+  #progress-box h3 { margin-bottom:14px; font-size:1rem; color:#1a1a2e; }
+  #progress-bar-wrap { background:#e0e0e0; border-radius:99px; height:10px; overflow:hidden; margin-bottom:10px; }
+  #progress-bar-fill { background:#2d6a4f; height:100%; width:0%; transition:width 0.2s; border-radius:99px; }
+  #progress-label { font-size:0.85rem; color:#666; }
+  .export-btn { background: #2d6a4f; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.88rem; cursor: pointer; font-weight: 600; }
+  .export-btn:hover { background: #1f4f3a; }
+  .export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/browser-id3-writer/dist/browser-id3-writer.min.js"></script>
+</head>
+<body>
+
+<div id="progress-overlay">
+  <div id="progress-box">
+    <h3>Building drill audio ZIP...</h3>
+    <div id="progress-bar-wrap"><div id="progress-bar-fill"></div></div>
+    <div id="progress-label">0 / 0</div>
+  </div>
+</div>
+
+<header>
+  <h1>🇰🇭 Khmer Phrases</h1>
+  <div style="display:flex;align-items:center;gap:16px">
+    <span id="stats"></span>
+    <a href="admin.html" class="admin-link">⚙ Admin</a>
+  </div>
+</header>
+
+<div id="drill-bar">
+  <div id="drill-settings">
+    <strong>Drill:</strong>
+    <label>
+      Slow speed:
+      <input type="range" id="slow-speed" min="0.40" max="0.95" value="0.87" step="0.01" oninput="document.getElementById('slow-speed-val').textContent=Math.round(this.value*100)+'%'">
+      <span id="slow-speed-val">87%</span>
+    </label>
+    <label>
+      Pause (s):
+      <input type="range" id="pause-dur" min="0.5" max="4" value="2" step="0.1" oninput="document.getElementById('pause-dur-val').textContent=this.value+'s'">
+      <span id="pause-dur-val">2s</span>
+    </label>
+    <button class="export-btn" id="export-btn" onclick="exportAllDrill()">⬇ Export ZIP</button>
+  </div>
+</div>
+
+<div class="page-wrap">
+  <div id="content">
+    <div id="loading">Loading phrases...</div>
+  </div>
+</div>
+
+<script>
+let allRows = [];
+let currentAudio = null;
+let currentPlayId = null;
+let currentDrillSource = null;
+let currentDrillId = null;
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+async function init() {
+  // 1. Try sessionStorage + base CSV (server mode)
+  const saved = (() => { try { return JSON.parse(sessionStorage.getItem('khmer_visibility') || 'null'); } catch(e) { return null; } })();
+
+  if (saved) {
+    try {
+      const r = await fetch('/khmer_phrases.csv');
+      if (r.ok) {
+        const text = await r.text();
+        loadFromBase(text, saved);
+        return;
+      }
+    } catch(e) {}
+  }
+
+  // 2. Fall back to khmer_phrases_filtered.csv (S3 / static mode)
+  try {
+    const r = await fetch('khmer_phrases_filtered.csv');
+    if (r.ok) { loadFromFiltered(await r.text()); return; }
+  } catch(e) {}
+
+  document.getElementById('loading').textContent = '❌ Could not load phrases. Open Admin first or provide khmer_phrases_filtered.csv.';
+}
+
+function parseCsv(text) {
+  return text.split(/\r?\n/).filter(l => l.trim()).map(line => {
+    const fields = []; let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+      else if (c === ',' && !inQ) { fields.push(cur); cur = ''; }
+      else cur += c;
+    }
+    fields.push(cur); return fields;
+  });
+}
+
+function loadFromBase(text, visMap) {
+  const [, ...data] = parseCsv(text);
+  allRows = data.map((r, i) => ({
+    id: i, category: r[0]||'', english: r[1]||'', khmer: r[2]||'', phonetic: r[3]||'', audioFile: r[4]||'',
+    visible: visMap[i] !== undefined ? visMap[i] : true,
+  })).filter(r => r.visible);
+  render();
+}
+
+function loadFromFiltered(text) {
+  const [, ...data] = parseCsv(text);
+  allRows = data
+    .map((r, i) => ({
+      id: i, category: r[0]||'', english: r[1]||'', khmer: r[2]||'', phonetic: r[3]||'', audioFile: r[4]||'',
+      visible: String(r[5]).toLowerCase() !== 'false',
+    }))
+    .filter(r => r.visible);
+  render();
+}
+
+function render() {
+  const grouped = {};
+  for (const row of allRows) {
+    if (!grouped[row.category]) grouped[row.category] = [];
+    grouped[row.category].push(row);
+  }
+  const content = document.getElementById('content');
+  content.innerHTML = '';
+  document.getElementById('stats').textContent = `${allRows.length} phrases · ${Object.keys(grouped).length} categories`;
+
+  for (const [cat, rows] of Object.entries(grouped)) {
+    const block = document.createElement('div');
+    block.className = 'category-block';
+    block.innerHTML = `
+      <div class="category-header" onclick="toggleCollapse(this)">
+        <h2>${escHtml(cat)} <span style="opacity:0.6;font-weight:400;font-size:0.85rem">(${rows.length})</span></h2>
+      </div>
+      <div class="category-body">
+        <table>
+          <thead><tr>
+            <th class="play-col" title="Play">▶</th>
+            <th class="drill-col" title="Play drill">🔁</th>
+            <th>English</th>
+            <th>Khmer</th>
+            <th>Phonetic</th>
+          </tr></thead>
+          <tbody>
+            ${rows.map(row => `
+              <tr>
+                <td class="play-col">${row.audioFile ? `<button class="play-btn" id="play-${row.id}" onclick="playAudio(${row.id})">▶</button>` : ''}</td>
+                <td class="drill-col">${row.audioFile ? `<button class="drill-btn" id="play-drill-${row.id}" onclick="playDrill(${row.id})" title="Play drill">🔁</button>` : ''}</td>
+                <td class="english">${escHtml(row.english)}</td>
+                <td class="khmer">${escHtml(row.khmer)}</td>
+                <td class="phonetic">${escHtml(row.phonetic)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    content.appendChild(block);
+  }
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function toggleCollapse(header) { header.nextElementSibling.classList.toggle('collapsed'); }
+
+function playAudio(id) {
+  const row = allRows.find(r => r.id === id);
+  if (!row || !row.audioFile) return;
+  if (currentPlayId === id) {
+    currentAudio.pause();
+    document.getElementById('play-' + id).textContent = '▶';
+    document.getElementById('play-' + id).classList.remove('playing');
+    currentAudio = null; currentPlayId = null; return;
+  }
+  if (currentAudio) {
+    currentAudio.pause();
+    const prev = document.getElementById('play-' + currentPlayId);
+    if (prev) { prev.textContent = '▶'; prev.classList.remove('playing'); }
+  }
+  const btn = document.getElementById('play-' + id);
+  const audio = new Audio('audio/' + row.audioFile.replace(/\\/g, '/'));
+  audio.play();
+  btn.textContent = '⏹'; btn.classList.add('playing');
+  currentAudio = audio; currentPlayId = id;
+  audio.onended = () => { btn.textContent = '▶'; btn.classList.remove('playing'); currentAudio = null; currentPlayId = null; };
+}
+
+// ── Drill ──────────────────────────────────────────────────────────────────
+
+async function loadAudioBuffer(url) {
+  const res = await fetch(url);
+  return await audioCtx.decodeAudioData(await res.arrayBuffer());
+}
+
+function createSilence(sec, sr) { return audioCtx.createBuffer(1, Math.floor(sec * sr), sr); }
+
+function stretchBuffer(buf, speed) {
+  const src = buf.getChannelData(0);
+  const outLen = Math.floor(src.length / speed);
+  const out = audioCtx.createBuffer(1, outLen, buf.sampleRate);
+  const dst = out.getChannelData(0);
+  for (let i = 0; i < outLen; i++) {
+    const p = i * speed, lo = Math.floor(p), hi = Math.min(lo + 1, src.length - 1), f = p - lo;
+    dst[i] = src[lo] * (1 - f) + src[hi] * f;
+  }
+  return out;
+}
+
+function concatBuffers(bufs, sr) {
+  const total = bufs.reduce((s, b) => s + b.length, 0);
+  const out = audioCtx.createBuffer(1, total, sr);
+  const dst = out.getChannelData(0);
+  let off = 0;
+  for (const b of bufs) {
+    const ch = b.numberOfChannels === 1 ? b.getChannelData(0) : (() => { const a = b.getChannelData(0), c = b.getChannelData(1), m = new Float32Array(b.length); for (let i=0;i<b.length;i++) m[i]=(a[i]+c[i])/2; return m; })();
+    dst.set(ch, off); off += b.length;
+  }
+  return out;
+}
+
+async function buildDrillBuffer(row) {
+  const speed = parseFloat(document.getElementById('slow-speed').value);
+  const pauseDur = parseFloat(document.getElementById('pause-dur').value);
+  const normal = await loadAudioBuffer('audio/' + row.audioFile.replace(/\\/g, '/'));
+  const sr = normal.sampleRate;
+  return concatBuffers([createSilence(1, sr), normal, createSilence(pauseDur, sr), stretchBuffer(normal, speed), createSilence(pauseDur, sr), normal, createSilence(1, sr)], sr);
+}
+
+async function playDrill(id) {
+  const row = allRows.find(r => r.id === id);
+  if (!row || !row.audioFile) return;
+  const btn = document.getElementById('play-drill-' + id);
+  if (currentDrillId === id && currentDrillSource) {
+    currentDrillSource.stop(); currentDrillSource = null; currentDrillId = null;
+    btn.textContent = '🔁'; btn.classList.remove('playing'); return;
+  }
+  if (currentDrillSource) {
+    currentDrillSource.stop();
+    const prev = document.getElementById('play-drill-' + currentDrillId);
+    if (prev) { prev.textContent = '🔁'; prev.classList.remove('playing'); }
+    currentDrillSource = null; currentDrillId = null;
+  }
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const buf = await buildDrillBuffer(row);
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf; src.connect(audioCtx.destination); src.start();
+    btn.disabled = false; btn.textContent = '⏹'; btn.classList.add('playing');
+    currentDrillSource = src; currentDrillId = id;
+    src.onended = () => { btn.textContent = '🔁'; btn.classList.remove('playing'); if (currentDrillId === id) { currentDrillSource = null; currentDrillId = null; } };
+  } catch(e) {
+    alert('Failed: ' + e.message);
+    btn.disabled = false; btn.textContent = '🔁';
+  }
+}
+
+// ── MP3 encode ────────────────────────────────────────────────────────────
+
+function encodeToMp3(buffer) {
+  const sr = buffer.sampleRate;
+  const raw = buffer.getChannelData(0);
+  const s16 = new Int16Array(raw.length);
+  for (let i = 0; i < raw.length; i++) s16[i] = Math.max(-32768, Math.min(32767, raw[i] * 32767));
+  const mp3enc = new lamejs.Mp3Encoder(1, sr, 128);
+  const CHUNK = 1152;
+  const chunks = [];
+  for (let i = 0; i < s16.length; i += CHUNK) {
+    const slice = s16.subarray(i, i + CHUNK);
+    const d = mp3enc.encodeBuffer(slice);
+    if (d.length > 0) chunks.push(new Uint8Array(d));
+  }
+  const end = mp3enc.flush();
+  if (end.length > 0) chunks.push(new Uint8Array(end));
+  const total = chunks.reduce((s, c) => s + c.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return out.buffer;
+}
+
+// ── Export all drill audio as ZIP ──────────────────────────────────────────
+
+async function exportAllDrill() {
+  const exportable = allRows.filter(r => r.audioFile);
+  if (!exportable.length) { alert('No audio to export.'); return; }
+
+  const btn = document.getElementById('export-btn');
+  const overlay = document.getElementById('progress-overlay');
+  const fill = document.getElementById('progress-bar-fill');
+  const label = document.getElementById('progress-label');
+
+  btn.disabled = true;
+  overlay.classList.add('active');
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  const zip = new JSZip();
+  let done = 0;
+
+  // Pre-compute per-category track counts
+  const catCounts = {};
+  const catIndex = {};
+  for (const row of exportable) {
+    catCounts[row.category] = (catCounts[row.category] || 0) + 1;
+    catIndex[row.category] = 0;
+  }
+
+  for (const row of exportable) {
+    label.textContent = `${done} / ${exportable.length}  — ${row.english}`;
+    fill.style.width = (done / exportable.length * 100) + '%';
+    await new Promise(r => setTimeout(r, 0)); // yield to UI
+
+    try {
+      const drillBuf = await buildDrillBuffer(row);
+      const mp3Buf = encodeToMp3(drillBuf);
+
+      catIndex[row.category]++;
+      const trackNum = `${catIndex[row.category]}/${catCounts[row.category]}`;
+
+      // Write ID3 tags
+      const writer = new ID3Writer(mp3Buf);
+      writer
+        .setFrame('TIT2', row.english)
+        .setFrame('TPE1', ['Loecsen'])
+        .setFrame('TALB', 'Khmer Drill - ' + row.category)
+        .setFrame('TCON', ['Language Learning'])
+        .setFrame('TRCK', trackNum)
+        .setFrame('COMM', { description: '', text: `${row.khmer}  [${row.phonetic}]`, language: 'eng' });
+      writer.addTag();
+
+      const catFolder = row.audioFile.replace(/[\\/][^\\/]+$/, '');
+      const safeName = row.english.replace(/[<>:"/\\|?*]/g, '_');
+      const phonPart  = row.phonetic ? ` (${row.phonetic})` : '';
+      zip.folder(catFolder).file(`${safeName}${phonPart} [drill].mp3`, writer.arrayBuffer);
+    } catch(e) {
+      console.warn('Skipping', row.english, e);
+    }
+
+    done++;
+  }
+
+  fill.style.width = '100%';
+  label.textContent = `Compressing ${done} files...`;
+  await new Promise(r => setTimeout(r, 0));
+
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'khmer_drill_audio.zip';
+  a.click();
+
+  overlay.classList.remove('active');
+  fill.style.width = '0%';
+  btn.disabled = false;
+}
+
+init();
+</script>
+</body>
+</html>
