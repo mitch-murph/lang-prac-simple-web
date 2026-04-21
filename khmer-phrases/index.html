@@ -12,7 +12,7 @@
   header h1 { font-size: 1.2rem; font-weight: 600; }
   #stats { font-size: 0.9rem; opacity: 0.8; }
   #drill-bar { padding: 12px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; }
-  #drill-settings { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; font-size: 0.88rem; color: #444; }
+  #drill-settings { max-width: 960px; margin: 0 auto; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 0.88rem; color: #444; }
   #drill-settings label { display: flex; align-items: center; gap: 8px; }
   #drill-settings input[type=range] { width: 120px; cursor: pointer; accent-color: #1a1a2e; }
   #drill-settings span { font-weight: 600; min-width: 36px; display: inline-block; }
@@ -58,8 +58,16 @@
   .lock-btn:hover { background: #5c5c88; }
   .lock-btn.active { background: #c0392b; }
   .lock-btn.active:hover { background: #922b21; }
-  .drill-bar-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .drill-bar-group-label { font-size: 0.75rem; color: #888; margin-right: 2px; }
+  /* Segmented button groups */
+  .btn-group { display: inline-flex; align-items: stretch; border-radius: 7px; overflow: hidden; box-shadow: 0 0 0 1px rgba(0,0,0,0.15); }
+  .btn-group .play-all-btn,
+  .btn-group .lock-btn { border-radius: 0; box-shadow: none; border-right: 1px solid rgba(255,255,255,0.18); }
+  .btn-group .play-all-btn:first-child,
+  .btn-group .lock-btn:first-child { border-radius: 7px 0 0 7px; }
+  .btn-group .play-all-btn:last-child,
+  .btn-group .lock-btn:last-child { border-radius: 0 7px 7px 0; border-right: none; }
+  .drill-bar-group { display: flex; align-items: center; gap: 8px; }
+  .drill-bar-group-label { font-size: 0.78rem; color: #666; font-weight: 600; white-space: nowrap; }
   #now-playing-bar { display:none; background:#2d6a4f; color:#fff; font-size:0.82rem; padding:6px 24px; text-align:center; }
   #now-playing-bar.visible { display:block; }
 
@@ -67,8 +75,13 @@
     header { padding: 12px 16px; }
     header h1 { font-size: 1rem; }
     .page-wrap { padding: 0 12px; }
-    #drill-settings { gap: 12px; }
-    #drill-settings input[type=range] { width: 90px; }
+    #drill-settings { gap: 10px; }
+    #drill-settings label { flex: 1 1 auto; min-width: 0; }
+    #drill-settings input[type=range] { width: 100%; max-width: 130px; }
+    .drill-bar-group { flex: 1 1 auto; }
+    .btn-group { display: flex; width: 100%; }
+    .btn-group .play-all-btn,
+    .btn-group .lock-btn { flex: 1; text-align: center; justify-content: center; }
     #content { padding: 16px 0 32px; }
     .category-header { padding: 10px 12px; }
     table thead { display: none; }
@@ -136,24 +149,29 @@
 
 <div id="drill-bar">
   <div id="drill-settings">
-    <strong>Drill:</strong>
     <label>
-      Slow speed:
-      <input type="range" id="slow-speed" min="0.40" max="0.95" value="0.87" step="0.01" oninput="document.getElementById('slow-speed-val').textContent=Math.round(this.value*100)+'%'">
+      Slow: <input type="range" id="slow-speed" min="0.40" max="0.95" value="0.87" step="0.01" oninput="document.getElementById('slow-speed-val').textContent=Math.round(this.value*100)+'%'">
       <span id="slow-speed-val">87%</span>
     </label>
     <label>
-      Pause (s):
-      <input type="range" id="pause-dur" min="0.5" max="4" value="2" step="0.1" oninput="document.getElementById('pause-dur-val').textContent=this.value+'s'">
+      Pause: <input type="range" id="pause-dur" min="0.5" max="4" value="2" step="0.1" oninput="document.getElementById('pause-dur-val').textContent=this.value+'s'">
       <span id="pause-dur-val">2s</span>
     </label>
-    <button class="play-all-btn" id="play-order-btn" onclick="togglePlayAll(false)">▶▶ In Order</button>
-    <button class="play-all-btn" id="play-shuffle-btn" onclick="togglePlayAll(true)">🔀 Shuffle</button>
-    <span style="color:#bbb">|</span>
-    <span class="drill-bar-group-label">🔒 Lock screen:</span>
-    <button class="lock-btn" id="lock-order-btn" onclick="togglePlayAllMerged(false)">▶▶ In Order</button>
-    <button class="lock-btn" id="lock-shuffle-btn" onclick="togglePlayAllMerged(true)">🔀 Shuffle</button>
-    <button class="export-btn" id="export-btn" onclick="exportAllDrill()">⬇ Export ZIP</button>
+    <div class="drill-bar-group">
+      <span class="drill-bar-group-label">▶ Play all:</span>
+      <div class="btn-group">
+        <button class="play-all-btn" id="play-order-btn" onclick="togglePlayAll(false)">⇛ In Order</button>
+        <button class="play-all-btn" id="play-shuffle-btn" onclick="togglePlayAll(true)">🔀 Shuffle</button>
+      </div>
+    </div>
+    <div class="drill-bar-group">
+      <span class="drill-bar-group-label">🔒 Lock screen:</span>
+      <div class="btn-group">
+        <button class="lock-btn" id="lock-order-btn" onclick="togglePlayAllMerged(false)">⇛ In Order</button>
+        <button class="lock-btn" id="lock-shuffle-btn" onclick="togglePlayAllMerged(true)">🔀 Shuffle</button>
+      </div>
+    </div>
+    <button class="export-btn" id="export-btn" onclick="exportAllDrill()">⬇ ZIP</button>
   </div>
 </div>
 <div id="now-playing-bar"></div>
