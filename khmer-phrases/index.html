@@ -54,6 +54,12 @@
   .play-all-btn:hover { background: #2d2d52; }
   .play-all-btn.active { background: #c0392b; }
   .play-all-btn.active:hover { background: #922b21; }
+  .lock-btn { background: #4a4a6a; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.88rem; cursor: pointer; font-weight: 600; }
+  .lock-btn:hover { background: #5c5c88; }
+  .lock-btn.active { background: #c0392b; }
+  .lock-btn.active:hover { background: #922b21; }
+  .drill-bar-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .drill-bar-group-label { font-size: 0.75rem; color: #888; margin-right: 2px; }
   #now-playing-bar { display:none; background:#2d6a4f; color:#fff; font-size:0.82rem; padding:6px 24px; text-align:center; }
   #now-playing-bar.visible { display:block; }
 
@@ -141,8 +147,12 @@
       <input type="range" id="pause-dur" min="0.5" max="4" value="2" step="0.1" oninput="document.getElementById('pause-dur-val').textContent=this.value+'s'">
       <span id="pause-dur-val">2s</span>
     </label>
-    <button class="play-all-btn" id="play-order-btn" onclick="togglePlayAll(false)">▶▶ Play All In Order</button>
-    <button class="play-all-btn" id="play-shuffle-btn" onclick="togglePlayAll(true)">🔀 Shuffle Play</button>
+    <button class="play-all-btn" id="play-order-btn" onclick="togglePlayAll(false)">▶▶ In Order</button>
+    <button class="play-all-btn" id="play-shuffle-btn" onclick="togglePlayAll(true)">🔀 Shuffle</button>
+    <span style="color:#bbb">|</span>
+    <span class="drill-bar-group-label">🔒 Lock screen:</span>
+    <button class="lock-btn" id="lock-order-btn" onclick="togglePlayAllMerged(false)">▶▶ In Order</button>
+    <button class="lock-btn" id="lock-shuffle-btn" onclick="togglePlayAllMerged(true)">🔀 Shuffle</button>
     <button class="export-btn" id="export-btn" onclick="exportAllDrill()">⬇ Export ZIP</button>
   </div>
 </div>
@@ -400,14 +410,19 @@ function stopPlayAll() {
   playAllActive = false;
   stopCurrentDrill();
   playAllQueue = []; playAllIndex = -1;
-  document.getElementById('play-order-btn').textContent = '▶▶ Play All In Order';
+  document.getElementById('play-order-btn').textContent = '▶▶ In Order';
   document.getElementById('play-order-btn').classList.remove('active');
-  document.getElementById('play-shuffle-btn').textContent = '🔀 Shuffle Play';
+  document.getElementById('play-shuffle-btn').textContent = '🔀 Shuffle';
   document.getElementById('play-shuffle-btn').classList.remove('active');
+  document.getElementById('lock-order-btn').textContent = '▶▶ In Order';
+  document.getElementById('lock-order-btn').classList.remove('active');
+  document.getElementById('lock-shuffle-btn').textContent = '🔀 Shuffle';
+  document.getElementById('lock-shuffle-btn').classList.remove('active');
   const bar = document.getElementById('now-playing-bar');
   bar.classList.remove('visible'); bar.textContent = '';
 }
 
+// Chained version — shows current phrase, requires screen on
 function togglePlayAll(shuffle) {
   if (playAllActive) { stopPlayAll(); return; }
   const rows = allRows.filter(r => r.audioFile);
@@ -444,6 +459,53 @@ async function playNextInQueue() {
     playAllIndex++;
     playNextInQueue();
   }
+}
+
+// Merged version — pre-builds one single buffer, survives screen lock
+async function togglePlayAllMerged(shuffle) {
+  if (playAllActive) { stopPlayAll(); return; }
+  const rows = allRows.filter(r => r.audioFile);
+  if (!rows.length) { alert('No audio to play.'); return; }
+  playAllQueue = shuffle ? [...rows].sort(() => Math.random() - 0.5) : [...rows];
+
+  const overlay = document.getElementById('progress-overlay');
+  const fill    = document.getElementById('progress-bar-fill');
+  const label   = document.getElementById('progress-label');
+  document.querySelector('#progress-box h3').textContent = 'Building playlist for lock screen…';
+  fill.style.width = '0%'; label.textContent = '0 / ' + playAllQueue.length;
+  overlay.classList.add('active');
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  const bufs = [];
+  for (let i = 0; i < playAllQueue.length; i++) {
+    const row = playAllQueue[i];
+    label.textContent = `${i + 1} / ${playAllQueue.length}  — ${row.english}`;
+    fill.style.width = (i / playAllQueue.length * 100) + '%';
+    await new Promise(r => setTimeout(r, 0));
+    try { bufs.push(await buildTripleBuffer(row)); }
+    catch(e) { console.warn('Skipping', row.english, e); }
+  }
+
+  fill.style.width = '100%'; label.textContent = 'Starting…';
+  await new Promise(r => setTimeout(r, 0));
+  overlay.classList.remove('active');
+  document.querySelector('#progress-box h3').textContent = 'Building drill audio ZIP…';
+
+  if (!bufs.length) return;
+
+  const merged = concatBuffers(bufs, bufs[0].sampleRate);
+  playAllActive = true;
+  if (shuffle) { const b = document.getElementById('lock-shuffle-btn'); b.textContent = '⏹ Stop'; b.classList.add('active'); }
+  else         { const b = document.getElementById('lock-order-btn');   b.textContent = '⏹ Stop'; b.classList.add('active'); }
+
+  const bar = document.getElementById('now-playing-bar');
+  bar.classList.add('visible');
+  bar.textContent = `🔒 Playing ${playAllQueue.length} phrases — ${shuffle ? 'shuffled' : 'in order'} (lock-screen safe)`;
+
+  const src = audioCtx.createBufferSource();
+  src.buffer = merged; src.connect(audioCtx.destination); src.start();
+  currentDrillSource = src; currentDrillId = -1;
+  src.onended = () => { if (playAllActive) stopPlayAll(); };
 }
 
 // ── MP3 encode ────────────────────────────────────────────────────────────
