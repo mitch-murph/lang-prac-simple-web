@@ -7,7 +7,7 @@ export interface KhmerCharacter {
 }
 
 // Loaded at runtime from public CSV so audio files align with the same filenames
-export async function loadCharacters(base = '/'): Promise<KhmerCharacter[]> {
+export async function loadCharacters(base = import.meta.env.BASE_URL): Promise<KhmerCharacter[]> {
   const response = await fetch(`${base}data/khmer-alphabet/content.csv`);
   const text = await response.text();
   const chars = text
