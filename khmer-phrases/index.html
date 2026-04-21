@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Khmer Phrases</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,7 +27,7 @@
   tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; }
   tbody tr:hover { background: #f9f9f9; }
   td { padding: 9px 12px; font-size: 0.9rem; vertical-align: middle; }
-  td.play-col, td.drill-col { width: 42px; text-align: center; }
+  td.play-col, td.triple-col, td.slow-col { width: 42px; text-align: center; }
   td.english { font-weight: 500; }
   td.khmer { font-family: 'Khmer', 'Noto Sans Khmer', sans-serif; font-size: 1rem; }
   td.phonetic { color: #555; font-style: italic; }
@@ -49,6 +50,61 @@
   .export-btn { background: #2d6a4f; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.88rem; cursor: pointer; font-weight: 600; }
   .export-btn:hover { background: #1f4f3a; }
   .export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .play-all-btn { background: #1a1a2e; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 0.88rem; cursor: pointer; font-weight: 600; }
+  .play-all-btn:hover { background: #2d2d52; }
+  .play-all-btn.active { background: #c0392b; }
+  .play-all-btn.active:hover { background: #922b21; }
+  #now-playing-bar { display:none; background:#2d6a4f; color:#fff; font-size:0.82rem; padding:6px 24px; text-align:center; }
+  #now-playing-bar.visible { display:block; }
+
+  @media (max-width: 600px) {
+    header { padding: 12px 16px; }
+    header h1 { font-size: 1rem; }
+    .page-wrap { padding: 0 12px; }
+    #drill-settings { gap: 12px; }
+    #drill-settings input[type=range] { width: 90px; }
+    #content { padding: 16px 0 32px; }
+    .category-header { padding: 10px 12px; }
+    table thead { display: none; }
+    /* Each row becomes a horizontal card: text block left, buttons right */
+    table tbody tr {
+      display: flex; flex-wrap: nowrap; align-items: center;
+      padding: 10px 12px; gap: 10px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    table tbody tr td { display: block; padding: 0; border: none; }
+    /* Text group stretches to fill space */
+    td.english  { order: 1; flex: 1 1 auto; font-size: 0.95rem; font-weight: 500; }
+    td.khmer    { order: 2; flex: 1 1 auto; font-size: 1rem; }
+    td.phonetic { order: 3; flex: 1 1 auto; font-size: 0.78rem; color: #666; font-style: italic; }
+    /* Wrap english+khmer+phonetic into a column */
+    td.english, td.khmer, td.phonetic { display: block; }
+    /* Fake column wrapper via a grid on the row */
+    table tbody tr {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto auto;
+      align-items: center;
+    }
+    td.english  { grid-column: 1; grid-row: 1; }
+    td.khmer    { grid-column: 1; grid-row: 2; }
+    td.phonetic { grid-column: 1; grid-row: 3; }
+    /* Buttons column: stacked vertically on the right */
+    td.play-col, td.triple-col, td.slow-col {
+      grid-column: 2;
+      display: flex; justify-content: center; align-items: center;
+      width: auto; padding: 0;
+    }
+    td.play-col   { grid-row: 1; }
+    td.triple-col { grid-row: 2; }
+    td.slow-col   { grid-row: 3; }
+    .play-btn  { font-size: 1.4rem; padding: 2px 4px; }
+    .drill-btn {
+      font-size: 0.82rem; padding: 4px 8px; font-weight: 700;
+      background: #f0f0f0; border-radius: 6px; border: 1px solid #ddd; color: #333;
+    }
+    .drill-btn.playing { background: #d4edda; border-color: #2d6a4f; color: #2d6a4f; }
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -85,9 +141,12 @@
       <input type="range" id="pause-dur" min="0.5" max="4" value="2" step="0.1" oninput="document.getElementById('pause-dur-val').textContent=this.value+'s'">
       <span id="pause-dur-val">2s</span>
     </label>
+    <button class="play-all-btn" id="play-order-btn" onclick="togglePlayAll(false)">▶▶ Play All In Order</button>
+    <button class="play-all-btn" id="play-shuffle-btn" onclick="togglePlayAll(true)">🔀 Shuffle Play</button>
     <button class="export-btn" id="export-btn" onclick="exportAllDrill()">⬇ Export ZIP</button>
   </div>
 </div>
+<div id="now-playing-bar"></div>
 
 <div class="page-wrap">
   <div id="content">
@@ -101,6 +160,9 @@ let currentAudio = null;
 let currentPlayId = null;
 let currentDrillSource = null;
 let currentDrillId = null;
+let playAllQueue = [];
+let playAllIndex = -1;
+let playAllActive = false;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
 async function init() {
@@ -180,8 +242,9 @@ function render() {
       <div class="category-body">
         <table>
           <thead><tr>
-            <th class="play-col" title="Play">▶</th>
-            <th class="drill-col" title="Play drill">🔁</th>
+            <th class="play-col" title="Normal speed">▶</th>
+            <th class="triple-col" title="Normal × slow × normal">×3</th>
+            <th class="slow-col" title="Slow speed ×1">🐢</th>
             <th>English</th>
             <th>Khmer</th>
             <th>Phonetic</th>
@@ -189,8 +252,9 @@ function render() {
           <tbody>
             ${rows.map(row => `
               <tr>
-                <td class="play-col">${row.audioFile ? `<button class="play-btn" id="play-${row.id}" onclick="playAudio(${row.id})">▶</button>` : ''}</td>
-                <td class="drill-col">${row.audioFile ? `<button class="drill-btn" id="play-drill-${row.id}" onclick="playDrill(${row.id})" title="Play drill">🔁</button>` : ''}</td>
+                <td class="play-col">${row.audioFile ? `<button class="play-btn" id="play-${row.id}" onclick="playAudio(${row.id})" title="Normal speed">▶</button>` : ''}</td>
+                <td class="triple-col">${row.audioFile ? `<button class="drill-btn" id="play-triple-${row.id}" onclick="playTriple(${row.id})" title="Normal → slow → normal">×3</button>` : ''}</td>
+                <td class="slow-col">${row.audioFile ? `<button class="drill-btn" id="play-slow-${row.id}" onclick="playSlow(${row.id})" title="Slow speed ×1">🐢</button>` : ''}</td>
                 <td class="english">${escHtml(row.english)}</td>
                 <td class="khmer">${escHtml(row.khmer)}</td>
                 <td class="phonetic">${escHtml(row.phonetic)}</td>
@@ -261,40 +325,124 @@ function concatBuffers(bufs, sr) {
   return out;
 }
 
-async function buildDrillBuffer(row) {
+async function buildTripleBuffer(row) {
   const speed = parseFloat(document.getElementById('slow-speed').value);
   const pauseDur = parseFloat(document.getElementById('pause-dur').value);
   const normal = await loadAudioBuffer('audio/' + row.audioFile.replace(/\\/g, '/'));
   const sr = normal.sampleRate;
-  return concatBuffers([createSilence(1, sr), normal, createSilence(pauseDur, sr), stretchBuffer(normal, speed), createSilence(pauseDur, sr), normal, createSilence(1, sr)], sr);
+  const pause = createSilence(pauseDur, sr);
+  const slow = stretchBuffer(normal, speed);
+  // normal → pause → slow → pause → normal
+  return concatBuffers([createSilence(0.5, sr), normal, pause, slow, pause, normal, createSilence(0.5, sr)], sr);
 }
 
-async function playDrill(id) {
-  const row = allRows.find(r => r.id === id);
-  if (!row || !row.audioFile) return;
-  const btn = document.getElementById('play-drill-' + id);
-  if (currentDrillId === id && currentDrillSource) {
-    currentDrillSource.stop(); currentDrillSource = null; currentDrillId = null;
-    btn.textContent = '🔁'; btn.classList.remove('playing'); return;
-  }
+async function buildSlowBuffer(row) {
+  const speed = parseFloat(document.getElementById('slow-speed').value);
+  const normal = await loadAudioBuffer('audio/' + row.audioFile.replace(/\\/g, '/'));
+  const sr = normal.sampleRate;
+  return concatBuffers([createSilence(0.5, sr), stretchBuffer(normal, speed), createSilence(0.5, sr)], sr);
+}
+
+function stopCurrentDrill() {
   if (currentDrillSource) {
-    currentDrillSource.stop();
-    const prev = document.getElementById('play-drill-' + currentDrillId);
-    if (prev) { prev.textContent = '🔁'; prev.classList.remove('playing'); }
+    currentDrillSource.onended = null;
+    try { currentDrillSource.stop(); } catch(e) {}
+    const prevTriple = document.getElementById('play-triple-' + currentDrillId);
+    const prevSlow   = document.getElementById('play-slow-'   + currentDrillId);
+    if (prevTriple) { prevTriple.textContent = '×3'; prevTriple.classList.remove('playing'); }
+    if (prevSlow)   { prevSlow.textContent   = '🐢'; prevSlow.classList.remove('playing'); }
     currentDrillSource = null; currentDrillId = null;
   }
+}
+
+async function playTriple(id) {
+  const row = allRows.find(r => r.id === id);
+  if (!row || !row.audioFile) return;
+  stopPlayAll();
+  const btn = document.getElementById('play-triple-' + id);
+  if (currentDrillId === id && currentDrillSource) { stopCurrentDrill(); btn.textContent = '×3'; btn.classList.remove('playing'); return; }
+  stopCurrentDrill();
   btn.disabled = true; btn.textContent = '⏳';
   try {
-    const buf = await buildDrillBuffer(row);
+    const buf = await buildTripleBuffer(row);
     if (audioCtx.state === 'suspended') await audioCtx.resume();
     const src = audioCtx.createBufferSource();
     src.buffer = buf; src.connect(audioCtx.destination); src.start();
     btn.disabled = false; btn.textContent = '⏹'; btn.classList.add('playing');
     currentDrillSource = src; currentDrillId = id;
-    src.onended = () => { btn.textContent = '🔁'; btn.classList.remove('playing'); if (currentDrillId === id) { currentDrillSource = null; currentDrillId = null; } };
+    src.onended = () => { btn.textContent = '×3'; btn.classList.remove('playing'); if (currentDrillId === id) { currentDrillSource = null; currentDrillId = null; } };
+  } catch(e) { alert('Failed: ' + e.message); btn.disabled = false; btn.textContent = '×3'; }
+}
+
+async function playSlow(id) {
+  const row = allRows.find(r => r.id === id);
+  if (!row || !row.audioFile) return;
+  stopPlayAll();
+  const btn = document.getElementById('play-slow-' + id);
+  if (currentDrillId === id && currentDrillSource) { stopCurrentDrill(); btn.textContent = '🐢'; btn.classList.remove('playing'); return; }
+  stopCurrentDrill();
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const buf = await buildSlowBuffer(row);
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf; src.connect(audioCtx.destination); src.start();
+    btn.disabled = false; btn.textContent = '⏹'; btn.classList.add('playing');
+    currentDrillSource = src; currentDrillId = id;
+    src.onended = () => { btn.textContent = '🐢'; btn.classList.remove('playing'); if (currentDrillId === id) { currentDrillSource = null; currentDrillId = null; } };
+  } catch(e) { alert('Failed: ' + e.message); btn.disabled = false; btn.textContent = '🐢'; }
+}
+
+// ── Play All ────────────────────────────────────────────────────────────────
+
+function stopPlayAll() {
+  if (!playAllActive) return;
+  playAllActive = false;
+  stopCurrentDrill();
+  playAllQueue = []; playAllIndex = -1;
+  document.getElementById('play-order-btn').textContent = '▶▶ Play All In Order';
+  document.getElementById('play-order-btn').classList.remove('active');
+  document.getElementById('play-shuffle-btn').textContent = '🔀 Shuffle Play';
+  document.getElementById('play-shuffle-btn').classList.remove('active');
+  const bar = document.getElementById('now-playing-bar');
+  bar.classList.remove('visible'); bar.textContent = '';
+}
+
+function togglePlayAll(shuffle) {
+  if (playAllActive) { stopPlayAll(); return; }
+  const rows = allRows.filter(r => r.audioFile);
+  if (!rows.length) { alert('No audio to play.'); return; }
+  playAllQueue = shuffle ? [...rows].sort(() => Math.random() - 0.5) : [...rows];
+  playAllIndex = 0;
+  playAllActive = true;
+  if (shuffle) { const b = document.getElementById('play-shuffle-btn'); b.textContent = '⏹ Stop'; b.classList.add('active'); }
+  else         { const b = document.getElementById('play-order-btn');   b.textContent = '⏹ Stop'; b.classList.add('active'); }
+  playNextInQueue();
+}
+
+async function playNextInQueue() {
+  if (!playAllActive || playAllIndex >= playAllQueue.length) { stopPlayAll(); return; }
+  const row = playAllQueue[playAllIndex];
+  const bar = document.getElementById('now-playing-bar');
+  bar.classList.add('visible');
+  bar.textContent = `▶ ${playAllIndex + 1} / ${playAllQueue.length}  —  ${row.english}${row.phonetic ? '  (' + row.phonetic + ')' : ''}`;
+  stopCurrentDrill();
+  try {
+    const buf = await buildTripleBuffer(row);
+    if (!playAllActive) return;
+    if (audioCtx.state === 'suspended') await audioCtx.resume();
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf; src.connect(audioCtx.destination); src.start();
+    currentDrillSource = src; currentDrillId = row.id;
+    src.onended = () => {
+      if (!playAllActive) return;
+      currentDrillSource = null; currentDrillId = null;
+      playAllIndex++;
+      playNextInQueue();
+    };
   } catch(e) {
-    alert('Failed: ' + e.message);
-    btn.disabled = false; btn.textContent = '🔁';
+    playAllIndex++;
+    playNextInQueue();
   }
 }
 
@@ -354,7 +502,7 @@ async function exportAllDrill() {
     await new Promise(r => setTimeout(r, 0)); // yield to UI
 
     try {
-      const drillBuf = await buildDrillBuffer(row);
+      const drillBuf = await buildTripleBuffer(row);
       const mp3Buf = encodeToMp3(drillBuf);
 
       catIndex[row.category]++;
