@@ -165,10 +165,10 @@
       </div>
     </div>
     <div class="drill-bar-group">
-      <span class="drill-bar-group-label">🔒 Lock screen:</span>
+      <span class="drill-bar-group-label">🔒 Download MP3:</span>
       <div class="btn-group">
-        <button class="lock-btn" id="lock-order-btn" onclick="togglePlayAllMerged(false)">⇛ In Order</button>
-        <button class="lock-btn" id="lock-shuffle-btn" onclick="togglePlayAllMerged(true)">🔀 Shuffle</button>
+        <button class="lock-btn" id="lock-order-btn" onclick="downloadMergedMp3(false)">⇛ In Order</button>
+        <button class="lock-btn" id="lock-shuffle-btn" onclick="downloadMergedMp3(true)">🔀 Shuffle</button>
       </div>
     </div>
     <button class="export-btn" id="export-btn" onclick="exportAllDrill()">⬇ ZIP</button>
@@ -186,12 +186,50 @@
 let allRows = [];
 let currentAudio = null;
 let currentPlayId = null;
-let currentDrillSource = null;
+let currentPlayType = null; // 'simple' | 'triple' | 'slow'
+let currentDrillSource = null; // Web Audio — only used for merged lock-screen play-all
 let currentDrillId = null;
 let playAllQueue = [];
 let playAllIndex = -1;
 let playAllActive = false;
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// Unlock AudioContext on first gesture (needed for merged lock-screen build)
+function unlockAudio() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  document.removeEventListener('touchstart', unlockAudio);
+  document.removeEventListener('mousedown', unlockAudio);
+}
+document.addEventListener('touchstart', unlockAudio);
+document.addEventListener('mousedown', unlockAudio);
+
+// Stop any HTMLAudioElement currently playing (▶ / ×3 / 🐢)
+function stopSimpleAudio() {
+  if (currentAudio) {
+    currentAudio.onended = null;
+    currentAudio.pause();
+    currentAudio.src = '';
+    currentAudio = null;
+  }
+  if (currentPlayId !== null) {
+    const pb = document.getElementById('play-'        + currentPlayId);
+    const tb = document.getElementById('play-triple-' + currentPlayId);
+    const sb = document.getElementById('play-slow-'   + currentPlayId);
+    if (pb) { pb.textContent = '▶'; pb.classList.remove('playing'); }
+    if (tb) { tb.textContent = '×3'; tb.classList.remove('playing'); tb.disabled = false; }
+    if (sb) { sb.textContent = '🐢'; sb.classList.remove('playing'); sb.disabled = false; }
+    currentPlayId = null; currentPlayType = null;
+  }
+}
+
+// Stop Web Audio node (merged lock-screen play-all only)
+function stopCurrentDrill() {
+  if (currentDrillSource) {
+    currentDrillSource.onended = null;
+    try { currentDrillSource.stop(); } catch(e) {}
+    currentDrillSource = null; currentDrillId = null;
+  }
+}
 
 async function init() {
   // 1. Try sessionStorage + base CSV (server mode)
@@ -301,23 +339,14 @@ function toggleCollapse(header) { header.nextElementSibling.classList.toggle('co
 function playAudio(id) {
   const row = allRows.find(r => r.id === id);
   if (!row || !row.audioFile) return;
-  if (currentPlayId === id) {
-    currentAudio.pause();
-    document.getElementById('play-' + id).textContent = '▶';
-    document.getElementById('play-' + id).classList.remove('playing');
-    currentAudio = null; currentPlayId = null; return;
-  }
-  if (currentAudio) {
-    currentAudio.pause();
-    const prev = document.getElementById('play-' + currentPlayId);
-    if (prev) { prev.textContent = '▶'; prev.classList.remove('playing'); }
-  }
+  if (currentPlayId === id && currentPlayType === 'simple') { stopSimpleAudio(); return; }
+  stopSimpleAudio(); stopCurrentDrill(); stopPlayAll();
   const btn = document.getElementById('play-' + id);
   const audio = new Audio('audio/' + row.audioFile.replace(/\\/g, '/'));
-  audio.play();
+  audio.play().catch(() => {});
   btn.textContent = '⏹'; btn.classList.add('playing');
-  currentAudio = audio; currentPlayId = id;
-  audio.onended = () => { btn.textContent = '▶'; btn.classList.remove('playing'); currentAudio = null; currentPlayId = null; };
+  currentAudio = audio; currentPlayId = id; currentPlayType = 'simple';
+  audio.onended = () => { btn.textContent = '▶'; btn.classList.remove('playing'); currentAudio = null; currentPlayId = null; currentPlayType = null; };
 }
 
 // ── Drill ──────────────────────────────────────────────────────────────────
@@ -371,54 +400,58 @@ async function buildSlowBuffer(row) {
   return concatBuffers([createSilence(0.5, sr), stretchBuffer(normal, speed), createSilence(0.5, sr)], sr);
 }
 
-function stopCurrentDrill() {
-  if (currentDrillSource) {
-    currentDrillSource.onended = null;
-    try { currentDrillSource.stop(); } catch(e) {}
-    const prevTriple = document.getElementById('play-triple-' + currentDrillId);
-    const prevSlow   = document.getElementById('play-slow-'   + currentDrillId);
-    if (prevTriple) { prevTriple.textContent = '×3'; prevTriple.classList.remove('playing'); }
-    if (prevSlow)   { prevSlow.textContent   = '🐢'; prevSlow.classList.remove('playing'); }
-    currentDrillSource = null; currentDrillId = null;
+// Play a triple sequence (normal → slow → normal) via HTMLAudioElement.
+// Calls onDone() when finished, or stops early if currentPlayId changes.
+function playTripleSequence(id, url, onDone) {
+  const speed   = parseFloat(document.getElementById('slow-speed').value);
+  const pauseMs = parseFloat(document.getElementById('pause-dur').value) * 1000;
+
+  function step(rate, next) {
+    if (currentPlayId !== id) return; // cancelled
+    const a = new Audio(url);
+    currentAudio = a;
+    a.playbackRate = rate;
+    a.play().catch(() => {});
+    a.onended = () => { if (currentPlayId === id) next(); };
   }
+
+  // normal → pause → slow → pause → normal
+  step(1, () => setTimeout(() =>
+    step(speed, () => setTimeout(() =>
+      step(1, () => { if (currentPlayId === id) onDone(); })
+    , pauseMs))
+  , pauseMs));
 }
 
-async function playTriple(id) {
+function playTriple(id) {
   const row = allRows.find(r => r.id === id);
   if (!row || !row.audioFile) return;
-  stopPlayAll();
+  if (currentPlayId === id && currentPlayType === 'triple') { stopSimpleAudio(); return; }
+  stopSimpleAudio(); stopCurrentDrill(); stopPlayAll();
   const btn = document.getElementById('play-triple-' + id);
-  if (currentDrillId === id && currentDrillSource) { stopCurrentDrill(); btn.textContent = '×3'; btn.classList.remove('playing'); return; }
-  stopCurrentDrill();
-  btn.disabled = true; btn.textContent = '⏳';
-  try {
-    const buf = await buildTripleBuffer(row);
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    const src = audioCtx.createBufferSource();
-    src.buffer = buf; src.connect(audioCtx.destination); src.start();
-    btn.disabled = false; btn.textContent = '⏹'; btn.classList.add('playing');
-    currentDrillSource = src; currentDrillId = id;
-    src.onended = () => { btn.textContent = '×3'; btn.classList.remove('playing'); if (currentDrillId === id) { currentDrillSource = null; currentDrillId = null; } };
-  } catch(e) { alert('Failed: ' + e.message); btn.disabled = false; btn.textContent = '×3'; }
+  const url = 'audio/' + row.audioFile.replace(/\\/g, '/');
+  currentPlayId = id; currentPlayType = 'triple';
+  btn.textContent = '⏹'; btn.classList.add('playing');
+  playTripleSequence(id, url, () => {
+    btn.textContent = '×3'; btn.classList.remove('playing');
+    currentAudio = null; currentPlayId = null; currentPlayType = null;
+  });
 }
 
-async function playSlow(id) {
+function playSlow(id) {
   const row = allRows.find(r => r.id === id);
   if (!row || !row.audioFile) return;
-  stopPlayAll();
+  if (currentPlayId === id && currentPlayType === 'slow') { stopSimpleAudio(); return; }
+  stopSimpleAudio(); stopCurrentDrill(); stopPlayAll();
   const btn = document.getElementById('play-slow-' + id);
-  if (currentDrillId === id && currentDrillSource) { stopCurrentDrill(); btn.textContent = '🐢'; btn.classList.remove('playing'); return; }
-  stopCurrentDrill();
-  btn.disabled = true; btn.textContent = '⏳';
-  try {
-    const buf = await buildSlowBuffer(row);
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    const src = audioCtx.createBufferSource();
-    src.buffer = buf; src.connect(audioCtx.destination); src.start();
-    btn.disabled = false; btn.textContent = '⏹'; btn.classList.add('playing');
-    currentDrillSource = src; currentDrillId = id;
-    src.onended = () => { btn.textContent = '🐢'; btn.classList.remove('playing'); if (currentDrillId === id) { currentDrillSource = null; currentDrillId = null; } };
-  } catch(e) { alert('Failed: ' + e.message); btn.disabled = false; btn.textContent = '🐢'; }
+  const url = 'audio/' + row.audioFile.replace(/\\/g, '/');
+  const speed = parseFloat(document.getElementById('slow-speed').value);
+  const a = new Audio(url);
+  a.playbackRate = speed;
+  a.play().catch(() => {});
+  btn.textContent = '⏹'; btn.classList.add('playing');
+  currentAudio = a; currentPlayId = id; currentPlayType = 'slow';
+  a.onended = () => { btn.textContent = '🐢'; btn.classList.remove('playing'); currentAudio = null; currentPlayId = null; currentPlayType = null; };
 }
 
 // ── Play All ────────────────────────────────────────────────────────────────
@@ -426,13 +459,14 @@ async function playSlow(id) {
 function stopPlayAll() {
   if (!playAllActive) return;
   playAllActive = false;
+  stopSimpleAudio();
   stopCurrentDrill();
   playAllQueue = []; playAllIndex = -1;
   document.getElementById('play-order-btn').textContent = '▶▶ In Order';
   document.getElementById('play-order-btn').classList.remove('active');
   document.getElementById('play-shuffle-btn').textContent = '🔀 Shuffle';
   document.getElementById('play-shuffle-btn').classList.remove('active');
-  document.getElementById('lock-order-btn').textContent = '▶▶ In Order';
+  document.getElementById('lock-order-btn').textContent = '⇛ In Order';
   document.getElementById('lock-order-btn').classList.remove('active');
   document.getElementById('lock-shuffle-btn').textContent = '🔀 Shuffle';
   document.getElementById('lock-shuffle-btn').classList.remove('active');
@@ -453,77 +487,68 @@ function togglePlayAll(shuffle) {
   playNextInQueue();
 }
 
-async function playNextInQueue() {
+function playNextInQueue() {
   if (!playAllActive || playAllIndex >= playAllQueue.length) { stopPlayAll(); return; }
   const row = playAllQueue[playAllIndex];
   const bar = document.getElementById('now-playing-bar');
   bar.classList.add('visible');
   bar.textContent = `▶ ${playAllIndex + 1} / ${playAllQueue.length}  —  ${row.english}${row.phonetic ? '  (' + row.phonetic + ')' : ''}`;
-  stopCurrentDrill();
-  try {
-    const buf = await buildTripleBuffer(row);
+  stopSimpleAudio();
+
+  const url = 'audio/' + row.audioFile.replace(/\\/g, '/');
+  currentPlayId = row.id; currentPlayType = 'triple';
+  playTripleSequence(row.id, url, () => {
+    currentAudio = null; currentPlayId = null; currentPlayType = null;
     if (!playAllActive) return;
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-    const src = audioCtx.createBufferSource();
-    src.buffer = buf; src.connect(audioCtx.destination); src.start();
-    currentDrillSource = src; currentDrillId = row.id;
-    src.onended = () => {
-      if (!playAllActive) return;
-      currentDrillSource = null; currentDrillId = null;
-      playAllIndex++;
-      playNextInQueue();
-    };
-  } catch(e) {
     playAllIndex++;
     playNextInQueue();
-  }
+  });
 }
 
 // Merged version — pre-builds one single buffer, survives screen lock
-async function togglePlayAllMerged(shuffle) {
-  if (playAllActive) { stopPlayAll(); return; }
+async function downloadMergedMp3(shuffle) {
   const rows = allRows.filter(r => r.audioFile);
-  if (!rows.length) { alert('No audio to play.'); return; }
-  playAllQueue = shuffle ? [...rows].sort(() => Math.random() - 0.5) : [...rows];
+  if (!rows.length) { alert('No audio to export.'); return; }
+  const queue = shuffle ? [...rows].sort(() => Math.random() - 0.5) : [...rows];
 
+  const btn = document.getElementById(shuffle ? 'lock-shuffle-btn' : 'lock-order-btn');
   const overlay = document.getElementById('progress-overlay');
   const fill    = document.getElementById('progress-bar-fill');
   const label   = document.getElementById('progress-label');
-  document.querySelector('#progress-box h3').textContent = 'Building playlist for lock screen…';
-  fill.style.width = '0%'; label.textContent = '0 / ' + playAllQueue.length;
+  document.querySelector('#progress-box h3').textContent = 'Building MP3…';
+  fill.style.width = '0%'; label.textContent = '0 / ' + queue.length;
   overlay.classList.add('active');
-  if (audioCtx.state === 'suspended') await audioCtx.resume();
+  btn.disabled = true;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  await audioCtx.resume();
 
   const bufs = [];
-  for (let i = 0; i < playAllQueue.length; i++) {
-    const row = playAllQueue[i];
-    label.textContent = `${i + 1} / ${playAllQueue.length}  — ${row.english}`;
-    fill.style.width = (i / playAllQueue.length * 100) + '%';
+  for (let i = 0; i < queue.length; i++) {
+    const row = queue[i];
+    label.textContent = `${i + 1} / ${queue.length}  — ${row.english}`;
+    fill.style.width = (i / queue.length * 100) + '%';
     await new Promise(r => setTimeout(r, 0));
     try { bufs.push(await buildTripleBuffer(row)); }
     catch(e) { console.warn('Skipping', row.english, e); }
   }
 
-  fill.style.width = '100%'; label.textContent = 'Starting…';
+  label.textContent = 'Encoding MP3…';
+  await new Promise(r => setTimeout(r, 0));
+
+  const merged = concatBuffers(bufs, bufs[0].sampleRate);
+  const mp3Buf = encodeToMp3(merged);
+
+  fill.style.width = '100%'; label.textContent = 'Saving…';
   await new Promise(r => setTimeout(r, 0));
   overlay.classList.remove('active');
   document.querySelector('#progress-box h3').textContent = 'Building drill audio ZIP…';
+  btn.disabled = false;
 
-  if (!bufs.length) return;
-
-  const merged = concatBuffers(bufs, bufs[0].sampleRate);
-  playAllActive = true;
-  if (shuffle) { const b = document.getElementById('lock-shuffle-btn'); b.textContent = '⏹ Stop'; b.classList.add('active'); }
-  else         { const b = document.getElementById('lock-order-btn');   b.textContent = '⏹ Stop'; b.classList.add('active'); }
-
-  const bar = document.getElementById('now-playing-bar');
-  bar.classList.add('visible');
-  bar.textContent = `🔒 Playing ${playAllQueue.length} phrases — ${shuffle ? 'shuffled' : 'in order'} (lock-screen safe)`;
-
-  const src = audioCtx.createBufferSource();
-  src.buffer = merged; src.connect(audioCtx.destination); src.start();
-  currentDrillSource = src; currentDrillId = -1;
-  src.onended = () => { if (playAllActive) stopPlayAll(); };
+  const filename = `khmer-drill-${shuffle ? 'shuffle' : 'ordered'}-${queue.length}phrases.mp3`;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([mp3Buf], { type: 'audio/mpeg' }));
+  a.download = filename;
+  a.click();
 }
 
 // ── MP3 encode ────────────────────────────────────────────────────────────
